@@ -2,10 +2,9 @@
 import { useState, useEffect } from 'react';
 
 export default function Dashboard() {
-  // นำ Web App URL ที่ได้จาก Google Apps Script มาวางแทนที่ข้อความด้านล่างนี้
+  // อย่าลืม! นำ Web App URL ที่ได้จาก Google Apps Script มาวางแทนที่ข้อความด้านล่างนี้
   const API_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL"; 
 
-  // เพิ่ม <any[]> เพื่อให้ TypeScript รู้ว่าเป็น Array
   const [scores, setScores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({ studentId: '', name: '', subject: '', score: '' });
@@ -26,12 +25,10 @@ export default function Dashboard() {
     fetchScores();
   }, []);
 
-  // เพิ่ม : any ให้กับ e
   const handleChange = (e: any) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // เพิ่ม : any ให้กับ e
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     setLoading(true);
@@ -58,7 +55,7 @@ export default function Dashboard() {
         
         <header className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">NVC Learning Hub</h1>
+            <h1 className="text-2xl font-bold text-gray-800">Krusave Score Hub</h1>
             <p className="text-gray-500 text-sm mt-1">ระบบจัดการคะแนนนักเรียน</p>
           </div>
         </header>
