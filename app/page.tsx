@@ -110,7 +110,7 @@ export default function Dashboard() {
                 </thead>
                 <tbody className="text-sm text-gray-700">
                   {loading && scores.length === 0 ? (
-                    <tr><td colSpan="4" className="text-center p-8 text-gray-500">กำลังโหลดข้อมูล...</td></tr>
+                    <tr><td colSpan={4} className="text-center p-8 text-gray-500">กำลังโหลดข้อมูล...</td></tr>
                   ) : (
                     scores.map((row, index) => (
                       <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition">
