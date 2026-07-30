@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 
 export default function Dashboard() {
   // นำ Web App URL อันใหม่ที่เพิ่ง Deploy มาวางแทนที่ข้อความด้านล่างนี้
-  const API_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL"; 
+  const API_URL = "https://script.google.com/macros/s/AKfycbwigSuwpf6tU5EOQr6o2Nqk4Di9-WfUNtq69Zhsi2LK-8E7C1MNxBTAQJL63bCignv65A/exec"; 
 
   // --- ระบบจัดการ State ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
