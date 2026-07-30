@@ -5,7 +5,8 @@ export default function Dashboard() {
   // นำ Web App URL ที่ได้จาก Google Apps Script มาวางแทนที่ข้อความด้านล่างนี้
   const API_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL"; 
 
-  const [scores, setScores] = useState([]);
+  // เพิ่ม <any[]> เพื่อให้ TypeScript รู้ว่าเป็น Array
+  const [scores, setScores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({ studentId: '', name: '', subject: '', score: '' });
 
@@ -25,11 +26,13 @@ export default function Dashboard() {
     fetchScores();
   }, []);
 
-  const handleChange = (e) => {
+  // เพิ่ม : any ให้กับ e
+  const handleChange = (e: any) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
+  // เพิ่ม : any ให้กับ e
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     setLoading(true);
     
