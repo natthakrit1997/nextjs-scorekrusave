@@ -6,7 +6,6 @@ export default function Dashboard() {
   const API_URL = "https://script.google.com/macros/s/AKfycbwigSuwpf6tU5EOQr6o2Nqk4Di9-WfUNtq69Zhsi2LK-8E7C1MNxBTAQJL63bCignv65A/exec"; 
 
   // --- State สำหรับควบคุมหน้าจอ ---
-  // 'student' = หน้าค้นหาของนักเรียน | 'login' = หน้าเข้าสู่ระบบ | 'teacher' = หน้าจัดการของครู
   const [appMode, setAppMode] = useState('student'); 
 
   // --- State สำหรับผู้ใช้งาน (ครู) ---
@@ -36,7 +35,7 @@ export default function Dashboard() {
     classLevel: '', studentId: '', name: '', subject: '', workName: '', score: '' 
   });
 
-  // โหลดข้อมูลทั้งหมดทันทีที่เปิดเว็บ (เพื่อให้นักเรียนค้นหาได้ทันที)
+  // โหลดข้อมูลทั้งหมดทันทีที่เปิดเว็บ
   useEffect(() => {
     fetchAllData();
     const savedName = sessionStorage.getItem('teacherName');
@@ -66,12 +65,10 @@ export default function Dashboard() {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     
-    // ค้นหาจากรหัสนักเรียน
     const foundStudent = students.find(s => s.StudentID.toString() === searchQuery.trim());
     
     if (foundStudent) {
       setSearchedStudent(foundStudent);
-      // กรองเฉพาะคะแนนของนักเรียนคนนี้
       const sScores = scores.filter(sc => sc.StudentID.toString() === foundStudent.StudentID.toString());
       setStudentScores(sScores);
     } else {
@@ -81,7 +78,7 @@ export default function Dashboard() {
     }
   };
 
-  // --- ฟังก์ชันจัดการระบบครู (Login / Logout / Submit) ---
+  // --- ฟังก์ชันจัดการระบบครู ---
   const handleLoginSubmit = async (e: any) => {
     e.preventDefault();
     setLoading(true);
@@ -144,7 +141,6 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen bg-gray-50 p-6 lg:p-10 font-sans">
         <div className="max-w-4xl mx-auto space-y-8">
-          
           <header className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-200">
             <div>
               <h1 className="text-2xl font-bold text-blue-700">Krusave Score Hub</h1>
@@ -203,7 +199,6 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-
         </div>
       </div>
     );
@@ -273,7 +268,16 @@ export default function Dashboard() {
             
             {activeTab === 'students' && (
               <form onSubmit={(e) => { e.preventDefault(); submitData('addStudent', studentForm, () => setStudentForm({studentId:'', name:'', classLevel:''})); }} className="space-y-4">
-                <input type="text" placeholder="ระดับชั้น (เช่น ปวช.1/1)" value={studentForm.classLevel} onChange={e => setStudentForm({...studentForm, classLevel: e.target.value})} required className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500" />
+                
+                {/* เปลี่ยน Input Text เป็น Select Dropdown */}
+                <select required value={studentForm.classLevel} onChange={e => setStudentForm({...studentForm, classLevel: e.target.value})} 
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- เลือกระดับชั้น --</option>
+                  <option value="ปวช">ปวช</option>
+                  <option value="ปวส">ปวส</option>
+                  <option value="ป.ตรี">ป.ตรี</option>
+                </select>
+
                 <input type="text" placeholder="รหัสนักเรียน" value={studentForm.studentId} onChange={e => setStudentForm({...studentForm, studentId: e.target.value})} required className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500" />
                 <input type="text" placeholder="ชื่อ-นามสกุล" value={studentForm.name} onChange={e => setStudentForm({...studentForm, name: e.target.value})} required className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500" />
                 <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-medium rounded-lg p-2.5 hover:bg-blue-700 disabled:opacity-50">บันทึกนักเรียน</button>
