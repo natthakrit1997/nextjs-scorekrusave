@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 
 export default function Dashboard() {
   // อย่าลืม! นำ Web App URL ที่ได้จาก Google Apps Script มาวางแทนที่ข้อความด้านล่างนี้
-  const API_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL"; 
+  const API_URL = "https://script.google.com/macros/s/AKfycbwigSuwpf6tU5EOQr6o2Nqk4Di9-WfUNtq69Zhsi2LK-8E7C1MNxBTAQJL63bCignv65A/exec"; 
 
   const [scores, setScores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
