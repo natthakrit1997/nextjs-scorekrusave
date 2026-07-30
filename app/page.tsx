@@ -1,65 +1,130 @@
-import Image from "next/image";
+'use client'
+import { useState, useEffect } from 'react';
 
-export default function Home() {
+export default function Dashboard() {
+  // นำ Web App URL ที่ได้จาก Google Apps Script มาวางแทนที่ข้อความด้านล่างนี้
+  const API_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL"; 
+
+  const [scores, setScores] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState({ studentId: '', name: '', subject: '', score: '' });
+
+  const fetchScores = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(API_URL);
+      const data = await res.json();
+      setScores(data);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchScores();
+  }, []);
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      await fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify(formData),
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8", 
+        }
+      });
+      setFormData({ studentId: '', name: '', subject: '', score: '' });
+      fetchScores(); 
+    } catch (error) {
+      console.error("Error saving data:", error);
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-gray-50 p-8 font-sans">
+      <div className="max-w-6xl mx-auto space-y-8">
+        
+        <header className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">NVC Learning Hub</h1>
+            <p className="text-gray-500 text-sm mt-1">ระบบจัดการคะแนนนักเรียน</p>
+          </div>
+        </header>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">เพิ่มคะแนนใหม่</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1">รหัสนักเรียน</label>
+                <input type="text" name="studentId" value={formData.studentId} onChange={handleChange} required
+                  className="w-full border border-gray-300 rounded-lg p-2 text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1">ชื่อ-นามสกุล</label>
+                <input type="text" name="name" value={formData.name} onChange={handleChange} required
+                  className="w-full border border-gray-300 rounded-lg p-2 text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1">รายวิชา</label>
+                <input type="text" name="subject" value={formData.subject} onChange={handleChange} required
+                  className="w-full border border-gray-300 rounded-lg p-2 text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1">คะแนน</label>
+                <input type="number" name="score" value={formData.score} onChange={handleChange} required
+                  className="w-full border border-gray-300 rounded-lg p-2 text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <button type="submit" disabled={loading}
+                className="w-full bg-blue-600 text-white font-medium rounded-lg p-2.5 mt-2 hover:bg-blue-700 transition disabled:opacity-50">
+                {loading ? 'กำลังบันทึก...' : 'บันทึกคะแนน'}
+              </button>
+            </form>
+          </div>
+
+          <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">ตารางคะแนนล่าสุด</h2>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-100 text-gray-600 text-sm border-b border-gray-200">
+                    <th className="p-3 font-medium">รหัสนักเรียน</th>
+                    <th className="p-3 font-medium">ชื่อ-นามสกุล</th>
+                    <th className="p-3 font-medium">รายวิชา</th>
+                    <th className="p-3 font-medium text-right">คะแนน</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm text-gray-700">
+                  {loading && scores.length === 0 ? (
+                    <tr><td colSpan="4" className="text-center p-8 text-gray-500">กำลังโหลดข้อมูล...</td></tr>
+                  ) : (
+                    scores.map((row, index) => (
+                      <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                        <td className="p-3">{row.StudentID}</td>
+                        <td className="p-3">{row.Name}</td>
+                        <td className="p-3">{row.Subject}</td>
+                        <td className="p-3 text-right font-semibold text-blue-600">{row.Score}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }
