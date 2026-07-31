@@ -16,7 +16,7 @@ export default function Dashboard() {
   
   // State ฐานข้อมูล
   const [students, setStudents] = useState<any[]>([]);
-  const [subjects, setSubjects] = useState<any[]>([]); // เพิ่ม State เก็บรายวิชา
+  const [subjects, setSubjects] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [scores, setScores] = useState<any[]>([]);
 
@@ -26,7 +26,7 @@ export default function Dashboard() {
 
   // State ฟอร์ม
   const [studentForm, setStudentForm] = useState({ studentId: '', name: '', classLevel: '' });
-  const [subjectForm, setSubjectForm] = useState({ classLevel: '', subject: '' }); // เพิ่ม Form รายวิชา
+  const [subjectForm, setSubjectForm] = useState({ classLevel: '', subject: '' });
   const [assignmentForm, setAssignmentForm] = useState({ classLevel: '', subject: '', workName: '' });
   const [scoreForm, setScoreForm] = useState({ classLevel: '', studentId: '', name: '', subject: '', workName: '', score: '' });
 
@@ -47,7 +47,7 @@ export default function Dashboard() {
       const data = await res.json();
       setScores(data.scores || []);
       setStudents(data.students || []);
-      setSubjects(data.subjects || []); // รับข้อมูลวิชา
+      setSubjects(data.subjects || []);
       setAssignments(data.assignments || []);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -58,10 +58,10 @@ export default function Dashboard() {
   const handleSearch = (e: any) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-    const foundStudent = students.find(s => s.StudentID.toString() === searchQuery.trim());
+    const foundStudent = students.find(s => String(s.StudentID) === String(searchQuery.trim()));
     if (foundStudent) {
       setSearchedStudent(foundStudent);
-      const sScores = scores.filter(sc => sc.StudentID.toString() === foundStudent.StudentID.toString());
+      const sScores = scores.filter(sc => String(sc.StudentID) === String(foundStudent.StudentID));
       setStudentScores(sScores);
     } else {
       setSearchedStudent(null);
@@ -137,15 +137,10 @@ export default function Dashboard() {
     }
   };
 
-  // ตัวช่วยกรองข้อมูลสำหรับ Dropdown
   const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
   const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
-  
-  // ดึงรายวิชาตามระดับชั้นที่เลือก
   const subjectsForAssignmentForm = subjects.filter(s => s.ClassLevel === assignmentForm.classLevel);
   const subjectsForScoreForm = subjects.filter(s => s.ClassLevel === scoreForm.classLevel);
-  
-  // ดึงชิ้นงานตามวิชาและระดับชั้นที่เลือก
   const filteredWorks = assignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel);
 
   if (appMode === 'student') {
@@ -250,7 +245,6 @@ export default function Dashboard() {
           </button>
         </header>
 
-        {/* เพิ่มเมนู จัดการรายวิชา */}
         <div className="flex space-x-1 bg-white p-1 rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
           {['students', 'subjects', 'assignments', 'scores'].map((tab) => (
             <button key={tab} onClick={() => setActiveTab(tab)}
@@ -283,7 +277,6 @@ export default function Dashboard() {
               </form>
             )}
 
-            {/* ฟอร์มเพิ่มรายวิชา */}
             {activeTab === 'subjects' && (
               <form onSubmit={(e) => { e.preventDefault(); submitData('addSubject', subjectForm, () => setSubjectForm({classLevel:'', subject:''})); }} className="space-y-4">
                 <select required value={subjectForm.classLevel} onChange={e => setSubjectForm({...subjectForm, classLevel: e.target.value})} 
@@ -307,7 +300,6 @@ export default function Dashboard() {
                   <option value="ปวส">ปวส</option>
                   <option value="ป.ตรี">ป.ตรี</option>
                 </select>
-                {/* เปลี่ยนช่องพิมพ์รายวิชา เป็น Dropdown ดึงจาก Subjects */}
                 <select required value={assignmentForm.subject} disabled={!assignmentForm.classLevel} onChange={e => setAssignmentForm({...assignmentForm, subject: e.target.value})} 
                   className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
                   <option value="">-- เลือกรายวิชา --</option>
@@ -326,13 +318,23 @@ export default function Dashboard() {
                   <option value="ปวส">ปวส</option>
                   <option value="ป.ตรี">ป.ตรี</option>
                 </select>
+                
+                {/* แก้ไขตรงนี้: เพิ่มการดักจับค่าว่าง (เมื่อครูเลือก "-- เลือกนักเรียน --") และแปลงค่าเป็น String ป้องกัน Error */}
                 <select required value={scoreForm.studentId} disabled={!scoreForm.classLevel} onChange={e => {
-                  const student = students.find(s => s.StudentID === e.target.value);
-                  setScoreForm({...scoreForm, studentId: student.StudentID, name: student.Name});
+                  const selectedId = e.target.value;
+                  if (!selectedId) {
+                    setScoreForm({...scoreForm, studentId: '', name: ''});
+                  } else {
+                    const student = students.find(s => String(s.StudentID) === String(selectedId));
+                    if (student) {
+                      setScoreForm({...scoreForm, studentId: student.StudentID, name: student.Name});
+                    }
+                  }
                 }} className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
                   <option value="">-- เลือกนักเรียน --</option>
                   {filteredStudents.map((s: any, i) => <option key={i} value={s.StudentID}>{s.StudentID} - {s.Name}</option>)}
                 </select>
+
                 <select required value={scoreForm.subject} disabled={!scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, subject: e.target.value, workName: ''})} className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
                   <option value="">-- เลือกรายวิชา --</option>
                   {subjectsForScoreForm.map((s: any, i) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
@@ -380,7 +382,6 @@ export default function Dashboard() {
                     </tbody>
                   </>
                 )}
-                {/* ตารางแสดงรายวิชา */}
                 {activeTab === 'subjects' && (
                   <>
                     <thead><tr className="bg-gray-100 text-gray-600 text-sm border-b"><th className="p-3">ระดับชั้น</th><th className="p-3">รายวิชา</th></tr></thead>
