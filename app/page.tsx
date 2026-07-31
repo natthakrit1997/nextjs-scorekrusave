@@ -4,9 +4,7 @@ import { useState, useEffect } from 'react';
 export default function Dashboard() {
   const API_URL = "https://script.google.com/macros/s/AKfycbwigSuwpf6tU5EOQr6o2Nqk4Di9-WfUNtq69Zhsi2LK-8E7C1MNxBTAQJL63bCignv65A/exec"; 
 
-  // --- State สำหรับ Dark Mode ---
   const [isDarkMode, setIsDarkMode] = useState(false);
-
   const [appMode, setAppMode] = useState('student'); 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [teacherName, setTeacherName] = useState('');
@@ -31,8 +29,24 @@ export default function Dashboard() {
   const [scoreForm, setScoreForm] = useState({ classLevel: '', studentId: '', name: '', subject: '', workName: '', score: '' });
   const [reportForm, setReportForm] = useState({ classLevel: '', subject: '' });
 
+  // ฟังก์ชันดึงคะแนนเก่าขึ้นมาโชว์อัตโนมัติ (UX Improvement)
   useEffect(() => {
-    // โหลดข้อมูลและเช็คสถานะการเข้าระบบ
+    if (scoreForm.studentId && scoreForm.subject && scoreForm.workName) {
+      const existing = scores.find(sc => 
+        String(sc.StudentID) === String(scoreForm.studentId) && 
+        sc.Subject === scoreForm.subject && 
+        sc.WorkName === scoreForm.workName &&
+        sc.TeacherName === teacherName
+      );
+      if (existing) {
+        setScoreForm(prev => prev.score !== existing.Score ? { ...prev, score: existing.Score } : prev);
+      } else {
+        setScoreForm(prev => ({ ...prev, score: '' }));
+      }
+    }
+  }, [scoreForm.studentId, scoreForm.subject, scoreForm.workName, scores, teacherName]);
+
+  useEffect(() => {
     fetchAllData();
     const savedName = sessionStorage.getItem('teacherName');
     if (savedName) {
@@ -40,7 +54,6 @@ export default function Dashboard() {
       setTeacherName(savedName);
       setAppMode('teacher');
     }
-    // เช็คสถานะ Dark Mode จากเครื่องผู้ใช้
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') setIsDarkMode(true);
   }, []);
@@ -173,6 +186,17 @@ export default function Dashboard() {
     }
   };
 
+  const mySubjects = subjects.filter(s => s.TeacherName === teacherName);
+  const myAssignments = assignments.filter(a => a.TeacherName === teacherName);
+  const myScores = scores.filter(sc => sc.TeacherName === teacherName);
+
+  const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
+  const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
+  const subjectsForAssignmentForm = mySubjects.filter(s => s.ClassLevel === assignmentForm.classLevel);
+  const subjectsForScoreForm = mySubjects.filter(s => s.ClassLevel === scoreForm.classLevel);
+  const filteredWorks = myAssignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel);
+  const subjectsForReportForm = mySubjects.filter(s => s.ClassLevel === reportForm.classLevel);
+
   const handlePrintReport = (e: any) => {
     e.preventDefault();
     const subjectWorks = myAssignments.filter(a => a.ClassLevel === reportForm.classLevel && a.Subject === reportForm.subject);
@@ -253,18 +277,6 @@ export default function Dashboard() {
     printWindow.document.close();
   };
 
-  const mySubjects = subjects.filter(s => s.TeacherName === teacherName);
-  const myAssignments = assignments.filter(a => a.TeacherName === teacherName);
-  const myScores = scores.filter(sc => sc.TeacherName === teacherName);
-
-  const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
-  const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
-  const subjectsForAssignmentForm = mySubjects.filter(s => s.ClassLevel === assignmentForm.classLevel);
-  const subjectsForScoreForm = mySubjects.filter(s => s.ClassLevel === scoreForm.classLevel);
-  const filteredWorks = myAssignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel);
-  const subjectsForReportForm = mySubjects.filter(s => s.ClassLevel === reportForm.classLevel);
-
-  // --- ชุดสี (Theme Classes) สำหรับสลับโหมด ---
   const theme = {
     bg: isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-800",
     card: isDarkMode ? "bg-gray-800 border-gray-700 shadow-lg" : "bg-white border-gray-100 shadow-sm",
@@ -277,9 +289,6 @@ export default function Dashboard() {
     primaryButton: "w-full bg-blue-600 text-white font-medium rounded-full p-3 hover:bg-blue-700 transition disabled:opacity-50 shadow-md hover:shadow-lg",
   };
 
-  // ==========================================
-  // โหมดที่ 1: หน้าค้นหาสำหรับนักเรียน (Public)
-  // ==========================================
   if (appMode === 'student') {
     return (
       <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 ${theme.bg}`}>
@@ -350,9 +359,6 @@ export default function Dashboard() {
     );
   }
 
-  // ==========================================
-  // โหมดที่ 2: หน้าต่าง Login สำหรับครู
-  // ==========================================
   if (appMode === 'login') {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 font-sans relative transition-colors duration-300 ${theme.bg}`}>
@@ -384,9 +390,6 @@ export default function Dashboard() {
     );
   }
 
-  // ==========================================
-  // โหมดที่ 3: หน้าจอ Dashboard หลัก (สำหรับครู)
-  // ==========================================
   return (
     <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 ${theme.bg}`}>
       <div className="max-w-6xl mx-auto space-y-6">
@@ -478,7 +481,7 @@ export default function Dashboard() {
                   {filteredWorks.map((w: any, i) => <option key={i} value={w.WorkName}>{w.WorkName}</option>)}
                 </select>
                 <input type="number" placeholder="กรอกคะแนนที่ได้" value={scoreForm.score} onChange={e => setScoreForm({...scoreForm, score: e.target.value})} required className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`} />
-                <button type="submit" disabled={loading} className={theme.primaryButton}>บันทึกคะแนน</button>
+                <button type="submit" disabled={loading} className={theme.primaryButton}>บันทึก / อัปเดตคะแนน</button>
               </form>
             )}
 
