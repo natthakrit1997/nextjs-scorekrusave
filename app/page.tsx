@@ -13,7 +13,10 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   
   const [activeTab, setActiveTab] = useState('scores');
+  
+  // State ฐานข้อมูล
   const [students, setStudents] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]); // เพิ่ม State เก็บรายวิชา
   const [assignments, setAssignments] = useState<any[]>([]);
   const [scores, setScores] = useState<any[]>([]);
 
@@ -21,7 +24,9 @@ export default function Dashboard() {
   const [searchedStudent, setSearchedStudent] = useState<any>(null);
   const [studentScores, setStudentScores] = useState<any[]>([]);
 
+  // State ฟอร์ม
   const [studentForm, setStudentForm] = useState({ studentId: '', name: '', classLevel: '' });
+  const [subjectForm, setSubjectForm] = useState({ classLevel: '', subject: '' }); // เพิ่ม Form รายวิชา
   const [assignmentForm, setAssignmentForm] = useState({ classLevel: '', subject: '', workName: '' });
   const [scoreForm, setScoreForm] = useState({ classLevel: '', studentId: '', name: '', subject: '', workName: '', score: '' });
 
@@ -42,6 +47,7 @@ export default function Dashboard() {
       const data = await res.json();
       setScores(data.scores || []);
       setStudents(data.students || []);
+      setSubjects(data.subjects || []); // รับข้อมูลวิชา
       setAssignments(data.assignments || []);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -113,10 +119,8 @@ export default function Dashboard() {
     setLoading(false);
   };
 
-  // --- ฟังก์ชันลบนักเรียน พร้อมแจ้งเตือน ---
   const handleDeleteStudent = async (studentId: string, studentName: string) => {
     const isConfirm = window.confirm(`คุณต้องการลบข้อมูลของ:\n"${studentName}" (รหัส: ${studentId})\nใช่หรือไม่?`);
-    
     if (isConfirm) {
       setLoading(true);
       try {
@@ -125,24 +129,25 @@ export default function Dashboard() {
           body: JSON.stringify({ action: "deleteStudent", studentId: studentId }),
           headers: { "Content-Type": "text/plain;charset=utf-8" }
         });
-        fetchAllData(); // โหลดข้อมูลใหม่เพื่ออัปเดตตาราง
+        fetchAllData(); 
       } catch (error) {
-        console.error("Error deleting student:", error);
         alert("เกิดข้อผิดพลาดในการลบข้อมูล");
       }
       setLoading(false);
     }
   };
 
+  // ตัวช่วยกรองข้อมูลสำหรับ Dropdown
   const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
-  const assignmentsForSelectedClass = assignments.filter(a => a.ClassLevel === scoreForm.classLevel);
-  const uniqueSubjects = Array.from(new Set(assignmentsForSelectedClass.map(a => a.Subject)));
   const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
+  
+  // ดึงรายวิชาตามระดับชั้นที่เลือก
+  const subjectsForAssignmentForm = subjects.filter(s => s.ClassLevel === assignmentForm.classLevel);
+  const subjectsForScoreForm = subjects.filter(s => s.ClassLevel === scoreForm.classLevel);
+  
+  // ดึงชิ้นงานตามวิชาและระดับชั้นที่เลือก
   const filteredWorks = assignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel);
 
-  // ==========================================
-  // โหมดที่ 1: หน้าค้นหาสำหรับนักเรียน (Public)
-  // ==========================================
   if (appMode === 'student') {
     return (
       <div className="min-h-screen bg-gray-50 p-6 lg:p-10 font-sans">
@@ -208,9 +213,6 @@ export default function Dashboard() {
     );
   }
 
-  // ==========================================
-  // โหมดที่ 2: หน้าต่าง Login สำหรับครู
-  // ==========================================
   if (appMode === 'login') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans relative">
@@ -235,9 +237,6 @@ export default function Dashboard() {
     );
   }
 
-  // ==========================================
-  // โหมดที่ 3: หน้าจอ Dashboard หลัก (สำหรับครู)
-  // ==========================================
   return (
     <div className="min-h-screen bg-gray-50 p-6 lg:p-10 font-sans">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -251,13 +250,14 @@ export default function Dashboard() {
           </button>
         </header>
 
+        {/* เพิ่มเมนู จัดการรายวิชา */}
         <div className="flex space-x-1 bg-white p-1 rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-          {['students', 'assignments', 'scores'].map((tab) => (
+          {['students', 'subjects', 'assignments', 'scores'].map((tab) => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition whitespace-nowrap ${
                 activeTab === tab ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}>
-              {tab === 'students' ? '👨‍🎓 จัดการนักเรียน' : tab === 'assignments' ? '📚 จัดการชิ้นงาน' : '📝 บันทึกคะแนน'}
+              {tab === 'students' ? '👨‍🎓 นักเรียน' : tab === 'subjects' ? '📖 รายวิชา' : tab === 'assignments' ? '📚 ชิ้นงาน' : '📝 บันทึกคะแนน'}
             </button>
           ))}
         </div>
@@ -265,7 +265,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">
-              {activeTab === 'students' ? 'เพิ่มนักเรียนใหม่' : activeTab === 'assignments' ? 'เพิ่มชิ้นงานใหม่' : 'ให้คะแนนนักเรียน'}
+              {activeTab === 'students' ? 'เพิ่มนักเรียนใหม่' : activeTab === 'subjects' ? 'เพิ่มรายวิชาใหม่' : activeTab === 'assignments' ? 'เพิ่มชิ้นงานใหม่' : 'ให้คะแนนนักเรียน'}
             </h2>
             
             {activeTab === 'students' && (
@@ -283,16 +283,36 @@ export default function Dashboard() {
               </form>
             )}
 
-            {activeTab === 'assignments' && (
-              <form onSubmit={(e) => { e.preventDefault(); submitData('addAssignment', assignmentForm, () => setAssignmentForm({classLevel:'', subject:'', workName:''})); }} className="space-y-4">
-                <select required value={assignmentForm.classLevel} onChange={e => setAssignmentForm({...assignmentForm, classLevel: e.target.value})} 
+            {/* ฟอร์มเพิ่มรายวิชา */}
+            {activeTab === 'subjects' && (
+              <form onSubmit={(e) => { e.preventDefault(); submitData('addSubject', subjectForm, () => setSubjectForm({classLevel:'', subject:''})); }} className="space-y-4">
+                <select required value={subjectForm.classLevel} onChange={e => setSubjectForm({...subjectForm, classLevel: e.target.value})} 
                   className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="">-- เลือกระดับชั้น --</option>
                   <option value="ปวช">ปวช</option>
                   <option value="ปวส">ปวส</option>
                   <option value="ป.ตรี">ป.ตรี</option>
                 </select>
-                <input type="text" placeholder="รายวิชา" value={assignmentForm.subject} onChange={e => setAssignmentForm({...assignmentForm, subject: e.target.value})} required className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500" />
+                <input type="text" placeholder="ชื่อรายวิชา" value={subjectForm.subject} onChange={e => setSubjectForm({...subjectForm, subject: e.target.value})} required className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500" />
+                <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-medium rounded-lg p-2.5 hover:bg-blue-700 disabled:opacity-50">บันทึกรายวิชา</button>
+              </form>
+            )}
+
+            {activeTab === 'assignments' && (
+              <form onSubmit={(e) => { e.preventDefault(); submitData('addAssignment', assignmentForm, () => setAssignmentForm({classLevel:'', subject:'', workName:''})); }} className="space-y-4">
+                <select required value={assignmentForm.classLevel} onChange={e => setAssignmentForm({...assignmentForm, classLevel: e.target.value, subject: ''})} 
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- เลือกระดับชั้น --</option>
+                  <option value="ปวช">ปวช</option>
+                  <option value="ปวส">ปวส</option>
+                  <option value="ป.ตรี">ป.ตรี</option>
+                </select>
+                {/* เปลี่ยนช่องพิมพ์รายวิชา เป็น Dropdown ดึงจาก Subjects */}
+                <select required value={assignmentForm.subject} disabled={!assignmentForm.classLevel} onChange={e => setAssignmentForm({...assignmentForm, subject: e.target.value})} 
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
+                  <option value="">-- เลือกรายวิชา --</option>
+                  {subjectsForAssignmentForm.map((s: any, i) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
+                </select>
                 <input type="text" placeholder="ชื่อชิ้นงาน" value={assignmentForm.workName} onChange={e => setAssignmentForm({...assignmentForm, workName: e.target.value})} required className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500" />
                 <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-medium rounded-lg p-2.5 hover:bg-blue-700 disabled:opacity-50">บันทึกชิ้นงาน</button>
               </form>
@@ -302,7 +322,9 @@ export default function Dashboard() {
               <form onSubmit={(e) => { e.preventDefault(); submitData('addScore', scoreForm, () => setScoreForm({...scoreForm, score:''})); }} className="space-y-4">
                 <select required value={scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, classLevel: e.target.value, studentId: '', name: '', subject: '', workName: ''})} className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="">-- เลือกระดับชั้น --</option>
-                  {uniqueClasses.map((c: any, i) => <option key={i} value={c}>{c}</option>)}
+                  <option value="ปวช">ปวช</option>
+                  <option value="ปวส">ปวส</option>
+                  <option value="ป.ตรี">ป.ตรี</option>
                 </select>
                 <select required value={scoreForm.studentId} disabled={!scoreForm.classLevel} onChange={e => {
                   const student = students.find(s => s.StudentID === e.target.value);
@@ -313,7 +335,7 @@ export default function Dashboard() {
                 </select>
                 <select required value={scoreForm.subject} disabled={!scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, subject: e.target.value, workName: ''})} className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
                   <option value="">-- เลือกรายวิชา --</option>
-                  {uniqueSubjects.map((s: any, i) => <option key={i} value={s}>{s}</option>)}
+                  {subjectsForScoreForm.map((s: any, i) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
                 </select>
                 <select required value={scoreForm.workName} disabled={!scoreForm.subject} onChange={e => setScoreForm({...scoreForm, workName: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
                   <option value="">-- เลือกชิ้นงาน --</option>
@@ -327,7 +349,7 @@ export default function Dashboard() {
 
           <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">
-              {activeTab === 'students' ? 'รายชื่อนักเรียนทั้งหมด' : activeTab === 'assignments' ? 'รายชื่อชิ้นงานทั้งหมด' : 'ตารางคะแนนล่าสุด'}
+              {activeTab === 'students' ? 'รายชื่อนักเรียนทั้งหมด' : activeTab === 'subjects' ? 'รายวิชาทั้งหมด' : activeTab === 'assignments' ? 'รายชื่อชิ้นงานทั้งหมด' : 'ตารางคะแนนล่าสุด'}
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -355,6 +377,16 @@ export default function Dashboard() {
                             </td>
                           </tr>
                         ))}
+                    </tbody>
+                  </>
+                )}
+                {/* ตารางแสดงรายวิชา */}
+                {activeTab === 'subjects' && (
+                  <>
+                    <thead><tr className="bg-gray-100 text-gray-600 text-sm border-b"><th className="p-3">ระดับชั้น</th><th className="p-3">รายวิชา</th></tr></thead>
+                    <tbody className="text-sm text-gray-700">
+                      {subjects.length === 0 ? <tr><td colSpan={2} className="text-center p-8">ยังไม่มีข้อมูล</td></tr> : 
+                        subjects.map((row, i) => <tr key={i} className="border-b hover:bg-gray-50"><td className="p-3">{row.ClassLevel}</td><td className="p-3">{row.Subject}</td></tr>)}
                     </tbody>
                   </>
                 )}
