@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 
 export default function Dashboard() {
+  // นำ Web App URL ของคุณมาวางแทนที่ข้อความด้านล่างนี้
   const API_URL = "https://script.google.com/macros/s/AKfycbwigSuwpf6tU5EOQr6o2Nqk4Di9-WfUNtq69Zhsi2LK-8E7C1MNxBTAQJL63bCignv65A/exec"; 
 
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -29,7 +30,7 @@ export default function Dashboard() {
   const [scoreForm, setScoreForm] = useState({ classLevel: '', studentId: '', name: '', subject: '', workName: '', score: '' });
   const [reportForm, setReportForm] = useState({ classLevel: '', subject: '' });
 
-  // ฟังก์ชันดึงคะแนนเก่าขึ้นมาโชว์อัตโนมัติ (UX Improvement)
+  // ดึงคะแนนเก่าขึ้นมาโชว์อัตโนมัติ
   useEffect(() => {
     if (scoreForm.studentId && scoreForm.subject && scoreForm.workName) {
       const existing = scores.find(sc => 
@@ -186,17 +187,6 @@ export default function Dashboard() {
     }
   };
 
-  const mySubjects = subjects.filter(s => s.TeacherName === teacherName);
-  const myAssignments = assignments.filter(a => a.TeacherName === teacherName);
-  const myScores = scores.filter(sc => sc.TeacherName === teacherName);
-
-  const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
-  const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
-  const subjectsForAssignmentForm = mySubjects.filter(s => s.ClassLevel === assignmentForm.classLevel);
-  const subjectsForScoreForm = mySubjects.filter(s => s.ClassLevel === scoreForm.classLevel);
-  const filteredWorks = myAssignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel);
-  const subjectsForReportForm = mySubjects.filter(s => s.ClassLevel === reportForm.classLevel);
-
   const handlePrintReport = (e: any) => {
     e.preventDefault();
     const subjectWorks = myAssignments.filter(a => a.ClassLevel === reportForm.classLevel && a.Subject === reportForm.subject);
@@ -221,6 +211,7 @@ export default function Dashboard() {
           @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&display=swap');
           body { font-family: 'Sarabun', sans-serif; padding: 20px; color: #333; }
           .header { text-align: center; margin-bottom: 20px; }
+          .logo { height: 60px; margin-bottom: 10px; object-fit: contain; }
           .header h2 { margin: 0; font-size: 24px; }
           .header p { margin: 5px 0; font-size: 16px; }
           table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
@@ -233,6 +224,7 @@ export default function Dashboard() {
       </head>
       <body>
         <div class="header">
+          <img src="/logo.png" alt="Logo" class="logo" onerror="this.style.display='none'" />
           <h2>รายงานสรุปผลคะแนนนักเรียน</h2>
           <p>ระดับชั้น: <b>${reportForm.classLevel}</b> | รายวิชา: <b>${reportForm.subject}</b></p>
           <p>ผู้สอน: ${teacherName}</p>
@@ -277,6 +269,17 @@ export default function Dashboard() {
     printWindow.document.close();
   };
 
+  const mySubjects = subjects.filter(s => s.TeacherName === teacherName);
+  const myAssignments = assignments.filter(a => a.TeacherName === teacherName);
+  const myScores = scores.filter(sc => sc.TeacherName === teacherName);
+
+  const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
+  const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
+  const subjectsForAssignmentForm = mySubjects.filter(s => s.ClassLevel === assignmentForm.classLevel);
+  const subjectsForScoreForm = mySubjects.filter(s => s.ClassLevel === scoreForm.classLevel);
+  const filteredWorks = myAssignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel);
+  const subjectsForReportForm = mySubjects.filter(s => s.ClassLevel === reportForm.classLevel);
+
   const theme = {
     bg: isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-800",
     card: isDarkMode ? "bg-gray-800 border-gray-700 shadow-lg" : "bg-white border-gray-100 shadow-sm",
@@ -289,15 +292,24 @@ export default function Dashboard() {
     primaryButton: "w-full bg-blue-600 text-white font-medium rounded-full p-3 hover:bg-blue-700 transition disabled:opacity-50 shadow-md hover:shadow-lg",
   };
 
+  // ==========================================
+  // โหมดที่ 1: หน้าค้นหาสำหรับนักเรียน (Public)
+  // ==========================================
   if (appMode === 'student') {
     return (
       <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 ${theme.bg}`}>
         <div className="max-w-4xl mx-auto space-y-8">
-          <header className={`flex justify-between items-center p-6 rounded-3xl border transition-colors duration-300 ${theme.card}`}>
-            <div>
-              <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-blue-400' : 'text-blue-700'}`}>Krusave Score Hub</h1>
-              <p className={`text-sm mt-1 ${theme.textMuted}`}>ระบบตรวจสอบคะแนนออนไลน์</p>
+          <header className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 rounded-3xl border gap-4 transition-colors duration-300 ${theme.card}`}>
+            
+            {/* โลโก้ส่วนหัวนักเรียน */}
+            <div className="flex items-center gap-4">
+              <img src="/logo.png" alt="Logo" className="w-12 h-12 sm:w-14 sm:h-14 object-contain drop-shadow-sm" onError={(e) => e.currentTarget.style.display = 'none'} />
+              <div>
+                <h1 className={`text-xl sm:text-2xl font-bold ${isDarkMode ? 'text-blue-400' : 'text-blue-700'}`}>Krusave Score Hub</h1>
+                <p className={`text-sm mt-1 ${theme.textMuted}`}>ระบบตรวจสอบคะแนนออนไลน์</p>
+              </div>
             </div>
+
             <div className="flex items-center gap-3">
               <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>
                 {isDarkMode ? '🌙' : '☀️'}
@@ -359,6 +371,9 @@ export default function Dashboard() {
     );
   }
 
+  // ==========================================
+  // โหมดที่ 2: หน้าต่าง Login สำหรับครู
+  // ==========================================
   if (appMode === 'login') {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 font-sans relative transition-colors duration-300 ${theme.bg}`}>
@@ -370,11 +385,15 @@ export default function Dashboard() {
             {isDarkMode ? '🌙' : '☀️'}
           </button>
         </div>
+        
         <div className={`p-10 rounded-3xl border w-full max-w-md transition-colors duration-300 ${theme.card}`}>
+          {/* โลโก้หน้า Login */}
           <div className="text-center mb-8">
+            <img src="/logo.png" alt="Logo" className="w-20 h-20 sm:w-24 sm:h-24 object-contain mx-auto mb-4 drop-shadow-md" onError={(e) => e.currentTarget.style.display = 'none'} />
             <h1 className="text-3xl font-bold mb-2">เข้าสู่ระบบ</h1>
             <p className={`text-sm ${theme.textMuted}`}>สำหรับครูผู้สอนเพื่อจัดการข้อมูล</p>
           </div>
+
           {errorMsg && <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-sm mb-6 text-center border border-red-100">{errorMsg}</div>}
           <form onSubmit={handleLoginSubmit} className="space-y-5">
             <input type="text" placeholder="Username" required onChange={(e) => setLoginData({...loginData, username: e.target.value})}
@@ -390,15 +409,24 @@ export default function Dashboard() {
     );
   }
 
+  // ==========================================
+  // โหมดที่ 3: หน้าจอ Dashboard หลัก (สำหรับครู)
+  // ==========================================
   return (
     <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 ${theme.bg}`}>
       <div className="max-w-6xl mx-auto space-y-6">
         
         <header className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 rounded-3xl border gap-4 transition-colors duration-300 ${theme.card}`}>
-          <div>
-            <h1 className="text-2xl font-bold">Krusave Score Hub <span className="text-blue-500">(Admin)</span></h1>
-            <p className={`text-sm mt-1 ${theme.textMuted}`}>ยินดีต้อนรับ, {teacherName}</p>
+          
+          {/* โลโก้ส่วนหัว Dashboard */}
+          <div className="flex items-center gap-4">
+            <img src="/logo.png" alt="Logo" className="w-12 h-12 sm:w-14 sm:h-14 object-contain drop-shadow-sm" onError={(e) => e.currentTarget.style.display = 'none'} />
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold">Krusave Score Hub <span className="text-blue-500">(Admin)</span></h1>
+              <p className={`text-sm mt-1 ${theme.textMuted}`}>ยินดีต้อนรับ, {teacherName}</p>
+            </div>
           </div>
+
           <div className="flex items-center gap-3">
             <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>
               {isDarkMode ? '🌙' : '☀️'}
