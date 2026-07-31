@@ -27,8 +27,6 @@ export default function Dashboard() {
   const [subjectForm, setSubjectForm] = useState({ classLevel: '', subject: '' });
   const [assignmentForm, setAssignmentForm] = useState({ classLevel: '', subject: '', workName: '' });
   const [scoreForm, setScoreForm] = useState({ classLevel: '', studentId: '', name: '', subject: '', workName: '', score: '' });
-  
-  // State สำหรับออกรายงาน
   const [reportForm, setReportForm] = useState({ classLevel: '', subject: '' });
 
   useEffect(() => {
@@ -107,9 +105,10 @@ export default function Dashboard() {
   const submitData = async (action: string, payload: any, resetForm: Function) => {
     setLoading(true);
     try {
+      // เพิ่ม teacherName แนบไปด้วยทุกครั้งที่ส่งฟอร์ม (ยกเว้นเรื่องนักเรียนที่จะใช้ร่วมกัน)
       await fetch(API_URL, {
         method: "POST",
-        body: JSON.stringify({ action, ...payload }),
+        body: JSON.stringify({ action, ...payload, teacherName }),
         headers: { "Content-Type": "text/plain;charset=utf-8" }
       });
       if (resetForm) resetForm();
@@ -132,10 +131,10 @@ export default function Dashboard() {
   };
 
   const handleDeleteSubject = async (classLevel: string, subject: string) => {
-    if (window.confirm(`⚠️ คำเตือน: คุณต้องการลบรายวิชา "${subject}" (${classLevel}) ใช่หรือไม่?\n\nการลบรายวิชานี้ จะทำการลบ "ชิ้นงาน" และ "คะแนน" ทั้งหมดที่อยู่ในรายวิชานี้ด้วย! (ไม่สามารถกู้คืนได้)`)) {
+    if (window.confirm(`⚠️ คำเตือน: คุณต้องการลบรายวิชา "${subject}" ใช่หรือไม่?\n\nการลบจะทำให้ "ชิ้นงาน" และ "คะแนน" ในวิชานี้ของคุณหายไปทั้งหมด`)) {
       setLoading(true);
       try {
-        await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteSubject", classLevel, subject }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
+        await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteSubject", classLevel, subject, teacherName }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
         fetchAllData(); 
       } catch (error) { alert("เกิดข้อผิดพลาดในการลบข้อมูล"); }
       setLoading(false);
@@ -143,10 +142,10 @@ export default function Dashboard() {
   };
 
   const handleDeleteAssignment = async (classLevel: string, subject: string, workName: string) => {
-    if (window.confirm(`⚠️ คำเตือน: คุณต้องการลบชิ้นงาน "${workName}" วิชา "${subject}" (${classLevel}) ใช่หรือไม่?\n\nการลบชิ้นงานนี้ จะทำให้ "คะแนน" ของนักเรียนทุกคนในชิ้นงานนี้ถูกลบไปด้วย!`)) {
+    if (window.confirm(`⚠️ คำเตือน: คุณต้องการลบชิ้นงาน "${workName}" วิชา "${subject}" ใช่หรือไม่?`)) {
       setLoading(true);
       try {
-        await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteAssignment", classLevel, subject, workName }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
+        await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteAssignment", classLevel, subject, workName, teacherName }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
         fetchAllData(); 
       } catch (error) { alert("เกิดข้อผิดพลาดในการลบข้อมูล"); }
       setLoading(false);
@@ -157,21 +156,28 @@ export default function Dashboard() {
     if (window.confirm(`คุณต้องการยกเลิกคะแนนของ:\n${studentName}\nชิ้นงาน "${workName}" วิชา "${subject}"\nใช่หรือไม่?`)) {
       setLoading(true);
       try {
-        await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteScore", studentId, subject, workName }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
+        await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteScore", studentId, subject, workName, teacherName }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
         fetchAllData(); 
       } catch (error) { alert("เกิดข้อผิดพลาดในการลบข้อมูล"); }
       setLoading(false);
     }
   };
 
-  // --- ฟังก์ชันสร้างและพิมพ์เอกสาร PDF ---
+  // --- กรองข้อมูลให้ตรงกับครูที่ Login อยู่เท่านั้น (My Data) ---
+  const mySubjects = subjects.filter(s => s.TeacherName === teacherName);
+  const myAssignments = assignments.filter(a => a.TeacherName === teacherName);
+  const myScores = scores.filter(sc => sc.TeacherName === teacherName);
+
+  const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
+  const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
+  const subjectsForAssignmentForm = mySubjects.filter(s => s.ClassLevel === assignmentForm.classLevel);
+  const subjectsForScoreForm = mySubjects.filter(s => s.ClassLevel === scoreForm.classLevel);
+  const filteredWorks = myAssignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel);
+  const subjectsForReportForm = mySubjects.filter(s => s.ClassLevel === reportForm.classLevel);
+
   const handlePrintReport = (e: any) => {
     e.preventDefault();
-    
-    // ดึงชิ้นงานทั้งหมดในวิชาและชั้นที่เลือก
-    const subjectWorks = assignments.filter(a => a.ClassLevel === reportForm.classLevel && a.Subject === reportForm.subject);
-    
-    // ดึงนักเรียนทั้งหมดในชั้นที่เลือก พร้อมเรียงลำดับรหัส
+    const subjectWorks = myAssignments.filter(a => a.ClassLevel === reportForm.classLevel && a.Subject === reportForm.subject);
     let subjectStudents = students.filter(s => s.ClassLevel === reportForm.classLevel);
     subjectStudents.sort((a, b) => String(a.StudentID).localeCompare(String(b.StudentID)));
 
@@ -180,7 +186,6 @@ export default function Dashboard() {
       return;
     }
 
-    // สร้างโครงสร้าง HTML สำหรับพิมพ์ (ใส่สไตล์สำหรับตารางให้เรียบร้อย)
     let printWindow = window.open('', '_blank');
     if (!printWindow) {
       alert("กรุณาอนุญาต Pop-up เพื่อดูรายงาน");
@@ -195,11 +200,7 @@ export default function Dashboard() {
         <title>รายงานคะแนน - ${reportForm.subject}</title>
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&display=swap');
-          body { 
-            font-family: 'Sarabun', sans-serif; 
-            padding: 20px; 
-            color: #333;
-          }
+          body { font-family: 'Sarabun', sans-serif; padding: 20px; color: #333; }
           .header { text-align: center; margin-bottom: 20px; }
           .header h2 { margin: 0; font-size: 24px; }
           .header p { margin: 5px 0; font-size: 16px; }
@@ -234,7 +235,7 @@ export default function Dashboard() {
             ${subjectStudents.map((student, idx) => {
               let totalScore = 0;
               let scoresHtml = subjectWorks.map(w => {
-                const s = scores.find(sc => String(sc.StudentID) === String(student.StudentID) && sc.Subject === reportForm.subject && sc.WorkName === w.WorkName);
+                const s = myScores.find(sc => String(sc.StudentID) === String(student.StudentID) && sc.Subject === reportForm.subject && sc.WorkName === w.WorkName);
                 const scoreVal = s ? Number(s.Score) : 0;
                 totalScore += scoreVal;
                 return `<td>${s ? s.Score : '-'}</td>`;
@@ -253,23 +254,14 @@ export default function Dashboard() {
           </tbody>
         </table>
         <script>
-          // สั่งให้หน้าต่างนี้โหลดเสร็จแล้วเด้งหน้าต่าง Print ขึ้นมาทันที
           window.onload = function() { window.print(); }
         </script>
       </body>
       </html>
     `;
-
     printWindow.document.write(html);
     printWindow.document.close();
   };
-
-  const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
-  const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
-  const subjectsForAssignmentForm = subjects.filter(s => s.ClassLevel === assignmentForm.classLevel);
-  const subjectsForScoreForm = subjects.filter(s => s.ClassLevel === scoreForm.classLevel);
-  const filteredWorks = assignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel);
-  const subjectsForReportForm = subjects.filter(s => s.ClassLevel === reportForm.classLevel);
 
   if (appMode === 'student') {
     return (
@@ -320,7 +312,7 @@ export default function Dashboard() {
                     ) : (
                       studentScores.map((row, i) => (
                         <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="p-3 font-medium text-gray-800">{row.Subject}</td>
+                          <td className="p-3 font-medium text-gray-800">{row.Subject} <span className="text-xs text-blue-500"><br/>(ครู: {row.TeacherName})</span></td>
                           <td className="p-3 text-gray-600">{row.WorkName}</td>
                           <td className="p-3 text-right font-bold text-blue-600 text-base">{row.Score}</td>
                         </tr>
@@ -471,7 +463,6 @@ export default function Dashboard() {
               </form>
             )}
 
-            {/* ฟอร์มออกรายงาน */}
             {activeTab === 'reports' && (
               <form onSubmit={handlePrintReport} className="space-y-4">
                 <select required value={reportForm.classLevel} onChange={e => setReportForm({classLevel: e.target.value, subject: ''})} 
@@ -495,7 +486,7 @@ export default function Dashboard() {
 
           <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">
-              {activeTab === 'students' ? 'รายชื่อนักเรียนทั้งหมด' : activeTab === 'subjects' ? 'รายวิชาทั้งหมด' : activeTab === 'assignments' ? 'รายชื่อชิ้นงานทั้งหมด' : activeTab === 'reports' ? 'ตัวอย่างข้อมูลคะแนน' : 'ตารางคะแนนล่าสุด'}
+              {activeTab === 'students' ? 'รายชื่อนักเรียนทั้งหมด (ส่วนกลาง)' : activeTab === 'subjects' ? 'วิชาของฉัน' : activeTab === 'assignments' ? 'ชิ้นงานของฉัน' : activeTab === 'reports' ? 'ตัวอย่างข้อมูลคะแนน' : 'คะแนนล่าสุดของฉัน'}
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -514,8 +505,8 @@ export default function Dashboard() {
                   <>
                     <thead><tr className="bg-gray-100 text-gray-600 text-sm border-b"><th className="p-3">ระดับชั้น</th><th className="p-3">รายวิชา</th><th className="p-3 text-center">จัดการ</th></tr></thead>
                     <tbody className="text-sm text-gray-700">
-                      {subjects.length === 0 ? <tr><td colSpan={3} className="text-center p-8">ยังไม่มีข้อมูล</td></tr> : 
-                        subjects.map((row, i) => (
+                      {mySubjects.length === 0 ? <tr><td colSpan={3} className="text-center p-8">ยังไม่มีข้อมูล</td></tr> : 
+                        mySubjects.map((row, i) => (
                           <tr key={i} className="border-b hover:bg-gray-50"><td className="p-3">{row.ClassLevel}</td><td className="p-3">{row.Subject}</td><td className="p-3 text-center"><button onClick={() => handleDeleteSubject(row.ClassLevel, row.Subject)} className="text-red-500 hover:text-red-700 font-medium py-1 px-2 rounded hover:bg-red-50 transition">ลบ</button></td></tr>
                         ))}
                     </tbody>
@@ -525,8 +516,8 @@ export default function Dashboard() {
                   <>
                     <thead><tr className="bg-gray-100 text-gray-600 text-sm border-b"><th className="p-3">ระดับชั้น</th><th className="p-3">รายวิชา</th><th className="p-3">ชื่อชิ้นงาน</th><th className="p-3 text-center">จัดการ</th></tr></thead>
                     <tbody className="text-sm text-gray-700">
-                      {assignments.length === 0 ? <tr><td colSpan={4} className="text-center p-8">ยังไม่มีข้อมูล</td></tr> : 
-                        assignments.map((row, i) => (
+                      {myAssignments.length === 0 ? <tr><td colSpan={4} className="text-center p-8">ยังไม่มีข้อมูล</td></tr> : 
+                        myAssignments.map((row, i) => (
                           <tr key={i} className="border-b hover:bg-gray-50"><td className="p-3">{row.ClassLevel}</td><td className="p-3">{row.Subject}</td><td className="p-3">{row.WorkName}</td><td className="p-3 text-center"><button onClick={() => handleDeleteAssignment(row.ClassLevel, row.Subject, row.WorkName)} className="text-red-500 hover:text-red-700 font-medium py-1 px-2 rounded hover:bg-red-50 transition">ลบ</button></td></tr>
                         ))}
                     </tbody>
@@ -536,8 +527,8 @@ export default function Dashboard() {
                   <>
                     <thead><tr className="bg-gray-100 text-gray-600 text-sm border-b whitespace-nowrap"><th className="p-3">ชั้น</th><th className="p-3">ชื่อ</th><th className="p-3">วิชา/ชิ้นงาน</th><th className="p-3 text-right">คะแนน</th>{activeTab === 'scores' && <th className="p-3 text-center">จัดการ</th>}</tr></thead>
                     <tbody className="text-sm text-gray-700">
-                      {scores.length === 0 ? <tr><td colSpan={5} className="text-center p-8">ยังไม่มีข้อมูลคะแนน</td></tr> : 
-                        scores.map((row, i) => (
+                      {myScores.length === 0 ? <tr><td colSpan={5} className="text-center p-8">ยังไม่มีข้อมูลคะแนน</td></tr> : 
+                        myScores.map((row, i) => (
                           <tr key={i} className="border-b hover:bg-gray-50">
                             <td className="p-3 whitespace-nowrap">{row.ClassLevel}</td>
                             <td className="p-3 whitespace-nowrap">{row.Name}</td>
