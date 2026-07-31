@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 
 export default function Dashboard() {
-  // นำ Web App URL ของคุณมาวางแทนที่ข้อความด้านล่างนี้
   const API_URL = "https://script.google.com/macros/s/AKfycbwigSuwpf6tU5EOQr6o2Nqk4Di9-WfUNtq69Zhsi2LK-8E7C1MNxBTAQJL63bCignv65A/exec"; 
 
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -30,7 +29,6 @@ export default function Dashboard() {
   const [scoreForm, setScoreForm] = useState({ classLevel: '', studentId: '', name: '', subject: '', workName: '', score: '' });
   const [reportForm, setReportForm] = useState({ classLevel: '', subject: '' });
 
-  // ดึงคะแนนเก่าขึ้นมาโชว์อัตโนมัติ
   useEffect(() => {
     if (scoreForm.studentId && scoreForm.subject && scoreForm.workName) {
       const existing = scores.find(sc => 
@@ -293,15 +291,34 @@ export default function Dashboard() {
   };
 
   // ==========================================
+  // ฟังก์ชันจัดกลุ่มคะแนนนักเรียนตามรายวิชา
+  // ==========================================
+  const getGroupedScores = () => {
+    return studentScores.reduce((acc, curr) => {
+      if (!acc[curr.Subject]) {
+        acc[curr.Subject] = {
+          teacher: curr.TeacherName,
+          scores: [],
+          total: 0
+        };
+      }
+      acc[curr.Subject].scores.push(curr);
+      acc[curr.Subject].total += Number(curr.Score) || 0;
+      return acc;
+    }, {} as Record<string, { teacher: string, scores: any[], total: number }>);
+  };
+
+  // ==========================================
   // โหมดที่ 1: หน้าค้นหาสำหรับนักเรียน (Public)
   // ==========================================
   if (appMode === 'student') {
+    const groupedScores = getGroupedScores();
+    const hasScores = Object.keys(groupedScores).length > 0;
+
     return (
       <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 ${theme.bg}`}>
         <div className="max-w-4xl mx-auto space-y-8">
           <header className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 rounded-3xl border gap-4 transition-colors duration-300 ${theme.card}`}>
-            
-            {/* โลโก้ส่วนหัวนักเรียน */}
             <div className="flex items-center gap-4">
               <img src="/logo.png" alt="Logo" className="w-12 h-12 sm:w-14 sm:h-14 object-contain drop-shadow-sm" onError={(e) => e.currentTarget.style.display = 'none'} />
               <div>
@@ -309,7 +326,6 @@ export default function Dashboard() {
                 <p className={`text-sm mt-1 ${theme.textMuted}`}>ระบบตรวจสอบคะแนนออนไลน์</p>
               </div>
             </div>
-
             <div className="flex items-center gap-3">
               <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>
                 {isDarkMode ? '🌙' : '☀️'}
@@ -322,7 +338,7 @@ export default function Dashboard() {
 
           <div className={`p-8 rounded-3xl border text-center transition-colors duration-300 ${theme.card}`}>
             <h2 className="text-xl font-semibold mb-2">ตรวจสอบคะแนนของฉัน</h2>
-            <p className={`text-sm mb-6 ${theme.textMuted}`}>กรอกรหัสนักเรียนเพื่อดูสรุปผลคะแนนงานแต่ละรายวิชา</p>
+            <p className={`text-sm mb-6 ${theme.textMuted}`}>กรอกรหัสนักเรียนเพื่อดูสรุปผลคะแนนแยกตามรายวิชา</p>
             <form onSubmit={handleSearch} className="max-w-md mx-auto flex flex-col sm:flex-row gap-3">
               <input type="text" placeholder="รหัสนักเรียน..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} required
                 className={`flex-1 border rounded-full px-5 py-3 outline-none text-center sm:text-left text-lg transition-colors ${theme.input}`} />
@@ -334,36 +350,49 @@ export default function Dashboard() {
 
           {searchedStudent && (
             <div className={`p-6 rounded-3xl border transition-colors duration-300 ${theme.card}`}>
-              <div className={`mb-6 p-5 rounded-2xl border flex flex-col md:flex-row justify-between md:items-center ${isDarkMode ? 'bg-blue-900/20 border-blue-800/30' : 'bg-blue-50 border-blue-100'}`}>
+              <div className={`mb-8 p-5 rounded-2xl border flex flex-col md:flex-row justify-between md:items-center ${isDarkMode ? 'bg-blue-900/20 border-blue-800/30' : 'bg-blue-50 border-blue-100'}`}>
                 <div>
-                  <h3 className="text-lg font-bold">{searchedStudent.Name}</h3>
+                  <h3 className="text-xl font-bold">{searchedStudent.Name}</h3>
                   <p className={`text-sm mt-1 ${isDarkMode ? 'text-blue-300' : 'text-gray-600'}`}>รหัส: {searchedStudent.StudentID} | ระดับชั้น: {searchedStudent.ClassLevel}</p>
                 </div>
               </div>
-              <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className={`text-sm border-b ${theme.tableHead}`}>
-                      <th className="p-4 font-medium w-1/3">รายวิชา</th>
-                      <th className="p-4 font-medium w-1/2">ชิ้นงาน</th>
-                      <th className="p-4 font-medium text-right">คะแนน</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm">
-                    {studentScores.length === 0 ? (
-                      <tr><td colSpan={3} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูลคะแนนในระบบ</td></tr>
-                    ) : (
-                      studentScores.map((row, i) => (
-                        <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
-                          <td className="p-4 font-medium">{row.Subject} <span className="text-xs text-blue-500"><br/>(ครู: {row.TeacherName})</span></td>
-                          <td className={`p-4 ${theme.textMuted}`}>{row.WorkName}</td>
-                          <td className="p-4 text-right font-bold text-blue-500 text-base">{row.Score}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+
+              {/* แสดงผลคะแนนแยกเป็นรายวิชา */}
+              {!hasScores ? (
+                <div className={`text-center p-10 rounded-2xl border ${isDarkMode ? 'border-gray-700 text-gray-400' : 'border-gray-200 text-gray-500'}`}>
+                  ยังไม่มีข้อมูลคะแนนในระบบสำหรับรหัสนักเรียนนี้
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {Object.keys(groupedScores).map((subject) => (
+                    <div key={subject} className={`overflow-hidden rounded-2xl border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                      {/* หัวการ์ดของแต่ละวิชา */}
+                      <div className={`p-4 sm:p-5 flex justify-between items-center border-b ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
+                        <div>
+                          <h4 className="font-bold text-lg text-blue-500">{subject}</h4>
+                          <p className={`text-xs mt-1 ${theme.textMuted}`}>ครูผู้สอน: {groupedScores[subject].teacher}</p>
+                        </div>
+                        <div className="text-right bg-blue-100 dark:bg-blue-900/30 px-4 py-2 rounded-xl border border-blue-200 dark:border-blue-800">
+                          <span className={`text-xs block ${isDarkMode ? 'text-blue-300' : 'text-blue-700'}`}>คะแนนรวม</span>
+                          <span className="font-bold text-2xl text-blue-600 dark:text-blue-400">{groupedScores[subject].total}</span>
+                        </div>
+                      </div>
+                      
+                      {/* ตารางงานในวิชานั้นๆ */}
+                      <table className="w-full text-left border-collapse">
+                        <tbody className="text-sm">
+                          {groupedScores[subject].scores.map((row, idx) => (
+                            <tr key={idx} className={`border-b last:border-0 transition-colors ${theme.tableRow}`}>
+                              <td className={`p-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{row.WorkName}</td>
+                              <td className="p-4 text-right font-bold w-24">{row.Score}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -387,13 +416,11 @@ export default function Dashboard() {
         </div>
         
         <div className={`p-10 rounded-3xl border w-full max-w-md transition-colors duration-300 ${theme.card}`}>
-          {/* โลโก้หน้า Login */}
           <div className="text-center mb-8">
             <img src="/logo.png" alt="Logo" className="w-20 h-20 sm:w-24 sm:h-24 object-contain mx-auto mb-4 drop-shadow-md" onError={(e) => e.currentTarget.style.display = 'none'} />
             <h1 className="text-3xl font-bold mb-2">เข้าสู่ระบบ</h1>
             <p className={`text-sm ${theme.textMuted}`}>สำหรับครูผู้สอนเพื่อจัดการข้อมูล</p>
           </div>
-
           {errorMsg && <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-sm mb-6 text-center border border-red-100">{errorMsg}</div>}
           <form onSubmit={handleLoginSubmit} className="space-y-5">
             <input type="text" placeholder="Username" required onChange={(e) => setLoginData({...loginData, username: e.target.value})}
@@ -417,8 +444,6 @@ export default function Dashboard() {
       <div className="max-w-6xl mx-auto space-y-6">
         
         <header className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 rounded-3xl border gap-4 transition-colors duration-300 ${theme.card}`}>
-          
-          {/* โลโก้ส่วนหัว Dashboard */}
           <div className="flex items-center gap-4">
             <img src="/logo.png" alt="Logo" className="w-12 h-12 sm:w-14 sm:h-14 object-contain drop-shadow-sm" onError={(e) => e.currentTarget.style.display = 'none'} />
             <div>
@@ -426,7 +451,6 @@ export default function Dashboard() {
               <p className={`text-sm mt-1 ${theme.textMuted}`}>ยินดีต้อนรับ, {teacherName}</p>
             </div>
           </div>
-
           <div className="flex items-center gap-3">
             <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>
               {isDarkMode ? '🌙' : '☀️'}
