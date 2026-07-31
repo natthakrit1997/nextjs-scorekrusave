@@ -116,7 +116,6 @@ export default function Dashboard() {
     setLoading(false);
   };
 
-  // --- ฟังก์ชันจัดการการลบข้อมูลแบบต่างๆ ---
   const handleDeleteStudent = async (studentId: string, studentName: string) => {
     if (window.confirm(`คุณต้องการลบข้อมูลนักเรียน:\n"${studentName}" (รหัส: ${studentId})\nใช่หรือไม่?`)) {
       setLoading(true);
@@ -133,7 +132,8 @@ export default function Dashboard() {
   };
 
   const handleDeleteSubject = async (classLevel: string, subject: string) => {
-    if (window.confirm(`คุณต้องการลบรายวิชา:\n"${subject}" (${classLevel})\nใช่หรือไม่?`)) {
+    // ปรับข้อความเตือนให้ครอบคลุมการลบแบบ Cascading
+    if (window.confirm(`⚠️ คำเตือน: คุณต้องการลบรายวิชา "${subject}" (${classLevel}) ใช่หรือไม่?\n\nการลบรายวิชานี้ จะทำการลบ "ชิ้นงาน" และ "คะแนน" ทั้งหมดที่อยู่ในรายวิชานี้ด้วย! (ไม่สามารถกู้คืนได้)`)) {
       setLoading(true);
       try {
         await fetch(API_URL, {
@@ -148,7 +148,7 @@ export default function Dashboard() {
   };
 
   const handleDeleteAssignment = async (classLevel: string, subject: string, workName: string) => {
-    if (window.confirm(`คุณต้องการลบชิ้นงาน:\n"${workName}" วิชา "${subject}" (${classLevel})\nใช่หรือไม่?`)) {
+    if (window.confirm(`⚠️ คำเตือน: คุณต้องการลบชิ้นงาน "${workName}" วิชา "${subject}" (${classLevel}) ใช่หรือไม่?\n\nการลบชิ้นงานนี้ จะทำให้ "คะแนน" ของนักเรียนทุกคนในชิ้นงานนี้ถูกลบไปด้วย!`)) {
       setLoading(true);
       try {
         await fetch(API_URL, {
