@@ -233,14 +233,14 @@ export default function Dashboard() {
               <th>ลำดับ</th>
               <th>รหัสนักเรียน</th>
               <th class="text-left">ชื่อ-นามสกุล</th>
-              ${subjectWorks.map(w => `<th>${w.WorkName}</th>`).join('')}
+              ${subjectWorks.map((w: any) => `<th>${w.WorkName}</th>`).join('')}
               <th class="total-col">รวม</th>
             </tr>
           </thead>
           <tbody>
-            ${subjectStudents.map((student, idx) => {
+            ${subjectStudents.map((student: any, idx: number) => {
               let totalScore = 0;
-              let scoresHtml = subjectWorks.map(w => {
+              let scoresHtml = subjectWorks.map((w: any) => {
                 const s = myScores.find(sc => String(sc.StudentID) === String(student.StudentID) && sc.Subject === reportForm.subject && sc.WorkName === w.WorkName);
                 const scoreVal = s ? Number(s.Score) : 0;
                 totalScore += scoreVal;
@@ -364,7 +364,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {Object.keys(groupedScores).map((subject) => (
+                  {Object.keys(groupedScores).map((subject: string) => (
                     <div key={subject} className={`overflow-hidden rounded-2xl border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
                       {/* หัวการ์ดของแต่ละวิชา */}
                       <div className={`p-4 sm:p-5 flex justify-between items-center border-b ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
@@ -381,7 +381,7 @@ export default function Dashboard() {
                       {/* ตารางงานในวิชานั้นๆ */}
                       <table className="w-full text-left border-collapse">
                         <tbody className="text-sm">
-                          {groupedScores[subject].scores.map((row, idx) => (
+                          {groupedScores[subject].scores.map((row: any, idx: number) => (
                             <tr key={idx} className={`border-b last:border-0 transition-colors ${theme.tableRow}`}>
                               <td className={`p-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{row.WorkName}</td>
                               <td className="p-4 text-right font-bold w-24">{row.Score}</td>
@@ -504,7 +504,7 @@ export default function Dashboard() {
                 </select>
                 <select required value={assignmentForm.subject} disabled={!assignmentForm.classLevel} onChange={e => setAssignmentForm({...assignmentForm, subject: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกรายวิชา --</option>
-                  {subjectsForAssignmentForm.map((s: any, i) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
+                  {subjectsForAssignmentForm.map((s: any, i: number) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
                 </select>
                 <input type="text" placeholder="ชื่อชิ้นงาน" value={assignmentForm.workName} onChange={e => setAssignmentForm({...assignmentForm, workName: e.target.value})} required className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`} />
                 <button type="submit" disabled={loading} className={theme.primaryButton}>บันทึกชิ้นงาน</button>
@@ -522,15 +522,15 @@ export default function Dashboard() {
                   else { const student = students.find(s => String(s.StudentID) === String(selectedId)); if (student) setScoreForm({...scoreForm, studentId: student.StudentID, name: student.Name}); }
                 }} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกนักเรียน --</option>
-                  {filteredStudents.map((s: any, i) => <option key={i} value={s.StudentID}>{s.StudentID} - {s.Name}</option>)}
+                  {filteredStudents.map((s: any, i: number) => <option key={i} value={s.StudentID}>{s.StudentID} - {s.Name}</option>)}
                 </select>
                 <select required value={scoreForm.subject} disabled={!scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, subject: e.target.value, workName: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกรายวิชา --</option>
-                  {subjectsForScoreForm.map((s: any, i) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
+                  {subjectsForScoreForm.map((s: any, i: number) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
                 </select>
                 <select required value={scoreForm.workName} disabled={!scoreForm.subject} onChange={e => setScoreForm({...scoreForm, workName: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกชิ้นงาน --</option>
-                  {filteredWorks.map((w: any, i) => <option key={i} value={w.WorkName}>{w.WorkName}</option>)}
+                  {filteredWorks.map((w: any, i: number) => <option key={i} value={w.WorkName}>{w.WorkName}</option>)}
                 </select>
                 <input type="number" placeholder="กรอกคะแนนที่ได้" value={scoreForm.score} onChange={e => setScoreForm({...scoreForm, score: e.target.value})} required className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`} />
                 <button type="submit" disabled={loading} className={theme.primaryButton}>บันทึก / อัปเดตคะแนน</button>
@@ -544,7 +544,7 @@ export default function Dashboard() {
                 </select>
                 <select required value={reportForm.subject} disabled={!reportForm.classLevel} onChange={e => setReportForm({...reportForm, subject: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกรายวิชา --</option>
-                  {subjectsForReportForm.map((s: any, i) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
+                  {subjectsForReportForm.map((s: any, i: number) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
                 </select>
                 <button type="submit" disabled={loading} className="w-full bg-green-600 text-white font-medium rounded-full p-3 hover:bg-green-700 shadow-md hover:shadow-lg transition">
                   ดาวน์โหลด PDF / พิมพ์รายงาน
@@ -564,7 +564,7 @@ export default function Dashboard() {
                     <thead><tr className={`text-sm border-b ${theme.tableHead}`}><th className="p-4 font-medium">ระดับชั้น</th><th className="p-4 font-medium">รหัสนักเรียน</th><th className="p-4 font-medium">ชื่อ-นามสกุล</th><th className="p-4 font-medium text-center">จัดการ</th></tr></thead>
                     <tbody className="text-sm">
                       {students.length === 0 ? <tr><td colSpan={4} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
-                        students.map((row, i) => (
+                        students.map((row: any, i: number) => (
                           <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
                             <td className="p-4">{row.ClassLevel}</td><td className="p-4">{row.StudentID}</td><td className="p-4">{row.Name}</td>
                             <td className="p-4 text-center"><button onClick={() => handleDeleteStudent(row.StudentID, row.Name)} className="text-red-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-red-500 transition">ลบ</button></td>
@@ -578,7 +578,7 @@ export default function Dashboard() {
                     <thead><tr className={`text-sm border-b ${theme.tableHead}`}><th className="p-4 font-medium">ระดับชั้น</th><th className="p-4 font-medium">รายวิชา</th><th className="p-4 font-medium text-center">จัดการ</th></tr></thead>
                     <tbody className="text-sm">
                       {mySubjects.length === 0 ? <tr><td colSpan={3} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
-                        mySubjects.map((row, i) => (
+                        mySubjects.map((row: any, i: number) => (
                           <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
                             <td className="p-4">{row.ClassLevel}</td><td className="p-4">{row.Subject}</td>
                             <td className="p-4 text-center"><button onClick={() => handleDeleteSubject(row.ClassLevel, row.Subject)} className="text-red-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-red-500 transition">ลบ</button></td>
@@ -592,7 +592,7 @@ export default function Dashboard() {
                     <thead><tr className={`text-sm border-b ${theme.tableHead}`}><th className="p-4 font-medium">ระดับชั้น</th><th className="p-4 font-medium">รายวิชา</th><th className="p-4 font-medium">ชื่อชิ้นงาน</th><th className="p-4 font-medium text-center">จัดการ</th></tr></thead>
                     <tbody className="text-sm">
                       {myAssignments.length === 0 ? <tr><td colSpan={4} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
-                        myAssignments.map((row, i) => (
+                        myAssignments.map((row: any, i: number) => (
                           <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
                             <td className="p-4">{row.ClassLevel}</td><td className="p-4">{row.Subject}</td><td className="p-4">{row.WorkName}</td>
                             <td className="p-4 text-center"><button onClick={() => handleDeleteAssignment(row.ClassLevel, row.Subject, row.WorkName)} className="text-red-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-red-500 transition">ลบ</button></td>
@@ -606,7 +606,7 @@ export default function Dashboard() {
                     <thead><tr className={`text-sm border-b whitespace-nowrap ${theme.tableHead}`}><th className="p-4 font-medium">ชั้น</th><th className="p-4 font-medium">ชื่อ</th><th className="p-4 font-medium">วิชา/ชิ้นงาน</th><th className="p-4 font-medium text-right">คะแนน</th>{activeTab === 'scores' && <th className="p-4 font-medium text-center">จัดการ</th>}</tr></thead>
                     <tbody className="text-sm">
                       {myScores.length === 0 ? <tr><td colSpan={5} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูลคะแนน</td></tr> : 
-                        myScores.map((row, i) => (
+                        myScores.map((row: any, i: number) => (
                           <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
                             <td className="p-4 whitespace-nowrap">{row.ClassLevel}</td>
                             <td className="p-4 whitespace-nowrap">{row.Name}</td>
