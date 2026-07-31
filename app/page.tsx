@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 
 export default function Dashboard() {
-  // นำ Web App URL อันใหม่ที่เพิ่ง Deploy มาวางแทนที่ข้อความด้านล่างนี้
+  // นำ Web App URL ของคุณมาวางแทนที่ข้อความด้านล่างนี้
   const API_URL = "https://script.google.com/macros/s/AKfycbwigSuwpf6tU5EOQr6o2Nqk4Di9-WfUNtq69Zhsi2LK-8E7C1MNxBTAQJL63bCignv65A/exec"; 
 
   const [appMode, setAppMode] = useState('student'); 
@@ -22,13 +22,8 @@ export default function Dashboard() {
   const [studentScores, setStudentScores] = useState<any[]>([]);
 
   const [studentForm, setStudentForm] = useState({ studentId: '', name: '', classLevel: '' });
-  
-  // อัปเดต State ให้ชิ้นงานมี classLevel
   const [assignmentForm, setAssignmentForm] = useState({ classLevel: '', subject: '', workName: '' });
-  
-  const [scoreForm, setScoreForm] = useState({ 
-    classLevel: '', studentId: '', name: '', subject: '', workName: '', score: '' 
-  });
+  const [scoreForm, setScoreForm] = useState({ classLevel: '', studentId: '', name: '', subject: '', workName: '', score: '' });
 
   useEffect(() => {
     fetchAllData();
@@ -57,9 +52,7 @@ export default function Dashboard() {
   const handleSearch = (e: any) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-    
     const foundStudent = students.find(s => s.StudentID.toString() === searchQuery.trim());
-    
     if (foundStudent) {
       setSearchedStudent(foundStudent);
       const sScores = scores.filter(sc => sc.StudentID.toString() === foundStudent.StudentID.toString());
@@ -112,7 +105,7 @@ export default function Dashboard() {
         body: JSON.stringify({ action, ...payload }),
         headers: { "Content-Type": "text/plain;charset=utf-8" }
       });
-      resetForm();
+      if (resetForm) resetForm();
       fetchAllData(); 
     } catch (error) {
       console.error("Error saving data:", error);
@@ -120,16 +113,36 @@ export default function Dashboard() {
     setLoading(false);
   };
 
+  // --- ฟังก์ชันลบนักเรียน พร้อมแจ้งเตือน ---
+  const handleDeleteStudent = async (studentId: string, studentName: string) => {
+    const isConfirm = window.confirm(`คุณต้องการลบข้อมูลของ:\n"${studentName}" (รหัส: ${studentId})\nใช่หรือไม่?`);
+    
+    if (isConfirm) {
+      setLoading(true);
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          body: JSON.stringify({ action: "deleteStudent", studentId: studentId }),
+          headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        fetchAllData(); // โหลดข้อมูลใหม่เพื่ออัปเดตตาราง
+      } catch (error) {
+        console.error("Error deleting student:", error);
+        alert("เกิดข้อผิดพลาดในการลบข้อมูล");
+      }
+      setLoading(false);
+    }
+  };
+
   const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
-  
-  // กรองวิชาให้แสดงเฉพาะวิชาที่มีในระดับชั้นที่เลือก
   const assignmentsForSelectedClass = assignments.filter(a => a.ClassLevel === scoreForm.classLevel);
   const uniqueSubjects = Array.from(new Set(assignmentsForSelectedClass.map(a => a.Subject)));
-  
   const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
-  // กรองชิ้นงานให้ตรงกับทั้งวิชาและระดับชั้น
   const filteredWorks = assignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel);
 
+  // ==========================================
+  // โหมดที่ 1: หน้าค้นหาสำหรับนักเรียน (Public)
+  // ==========================================
   if (appMode === 'student') {
     return (
       <div className="min-h-screen bg-gray-50 p-6 lg:p-10 font-sans">
@@ -195,6 +208,9 @@ export default function Dashboard() {
     );
   }
 
+  // ==========================================
+  // โหมดที่ 2: หน้าต่าง Login สำหรับครู
+  // ==========================================
   if (appMode === 'login') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans relative">
@@ -219,6 +235,9 @@ export default function Dashboard() {
     );
   }
 
+  // ==========================================
+  // โหมดที่ 3: หน้าจอ Dashboard หลัก (สำหรับครู)
+  // ==========================================
   return (
     <div className="min-h-screen bg-gray-50 p-6 lg:p-10 font-sans">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -266,7 +285,6 @@ export default function Dashboard() {
 
             {activeTab === 'assignments' && (
               <form onSubmit={(e) => { e.preventDefault(); submitData('addAssignment', assignmentForm, () => setAssignmentForm({classLevel:'', subject:'', workName:''})); }} className="space-y-4">
-                {/* เพิ่ม Dropdown เลือกระดับชั้น สำหรับสร้างชิ้นงาน */}
                 <select required value={assignmentForm.classLevel} onChange={e => setAssignmentForm({...assignmentForm, classLevel: e.target.value})} 
                   className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="">-- เลือกระดับชั้น --</option>
@@ -315,16 +333,33 @@ export default function Dashboard() {
               <table className="w-full text-left border-collapse">
                 {activeTab === 'students' && (
                   <>
-                    <thead><tr className="bg-gray-100 text-gray-600 text-sm border-b"><th className="p-3">ระดับชั้น</th><th className="p-3">รหัสนักเรียน</th><th className="p-3">ชื่อ-นามสกุล</th></tr></thead>
+                    <thead>
+                      <tr className="bg-gray-100 text-gray-600 text-sm border-b">
+                        <th className="p-3">ระดับชั้น</th>
+                        <th className="p-3">รหัสนักเรียน</th>
+                        <th className="p-3">ชื่อ-นามสกุล</th>
+                        <th className="p-3 text-center">จัดการ</th>
+                      </tr>
+                    </thead>
                     <tbody className="text-sm text-gray-700">
-                      {students.length === 0 ? <tr><td colSpan={3} className="text-center p-8">ยังไม่มีข้อมูล</td></tr> : 
-                        students.map((row, i) => <tr key={i} className="border-b hover:bg-gray-50"><td className="p-3">{row.ClassLevel}</td><td className="p-3">{row.StudentID}</td><td className="p-3">{row.Name}</td></tr>)}
+                      {students.length === 0 ? <tr><td colSpan={4} className="text-center p-8">ยังไม่มีข้อมูล</td></tr> : 
+                        students.map((row, i) => (
+                          <tr key={i} className="border-b hover:bg-gray-50">
+                            <td className="p-3">{row.ClassLevel}</td>
+                            <td className="p-3">{row.StudentID}</td>
+                            <td className="p-3">{row.Name}</td>
+                            <td className="p-3 text-center">
+                              <button onClick={() => handleDeleteStudent(row.StudentID, row.Name)} className="text-red-500 hover:text-red-700 font-medium py-1 px-2 rounded hover:bg-red-50 transition">
+                                ลบ
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </>
                 )}
                 {activeTab === 'assignments' && (
                   <>
-                    {/* เพิ่มคอลัมน์ ระดับชั้น ในตารางชิ้นงาน */}
                     <thead><tr className="bg-gray-100 text-gray-600 text-sm border-b"><th className="p-3">ระดับชั้น</th><th className="p-3">รายวิชา</th><th className="p-3">ชื่อชิ้นงาน</th></tr></thead>
                     <tbody className="text-sm text-gray-700">
                       {assignments.length === 0 ? <tr><td colSpan={3} className="text-center p-8">ยังไม่มีข้อมูล</td></tr> : 
