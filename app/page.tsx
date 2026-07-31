@@ -2,8 +2,10 @@
 import { useState, useEffect } from 'react';
 
 export default function Dashboard() {
-  // นำ Web App URL ของคุณมาวางแทนที่ข้อความด้านล่างนี้
   const API_URL = "https://script.google.com/macros/s/AKfycbwigSuwpf6tU5EOQr6o2Nqk4Di9-WfUNtq69Zhsi2LK-8E7C1MNxBTAQJL63bCignv65A/exec"; 
+
+  // --- State สำหรับ Dark Mode ---
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   const [appMode, setAppMode] = useState('student'); 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -30,6 +32,7 @@ export default function Dashboard() {
   const [reportForm, setReportForm] = useState({ classLevel: '', subject: '' });
 
   useEffect(() => {
+    // โหลดข้อมูลและเช็คสถานะการเข้าระบบ
     fetchAllData();
     const savedName = sessionStorage.getItem('teacherName');
     if (savedName) {
@@ -37,7 +40,15 @@ export default function Dashboard() {
       setTeacherName(savedName);
       setAppMode('teacher');
     }
+    // เช็คสถานะ Dark Mode จากเครื่องผู้ใช้
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') setIsDarkMode(true);
   }, []);
+
+  const toggleDarkMode = () => {
+    setIsDarkMode(!isDarkMode);
+    localStorage.setItem('theme', !isDarkMode ? 'dark' : 'light');
+  };
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -105,7 +116,6 @@ export default function Dashboard() {
   const submitData = async (action: string, payload: any, resetForm: Function) => {
     setLoading(true);
     try {
-      // เพิ่ม teacherName แนบไปด้วยทุกครั้งที่ส่งฟอร์ม (ยกเว้นเรื่องนักเรียนที่จะใช้ร่วมกัน)
       await fetch(API_URL, {
         method: "POST",
         body: JSON.stringify({ action, ...payload, teacherName }),
@@ -163,18 +173,6 @@ export default function Dashboard() {
     }
   };
 
-  // --- กรองข้อมูลให้ตรงกับครูที่ Login อยู่เท่านั้น (My Data) ---
-  const mySubjects = subjects.filter(s => s.TeacherName === teacherName);
-  const myAssignments = assignments.filter(a => a.TeacherName === teacherName);
-  const myScores = scores.filter(sc => sc.TeacherName === teacherName);
-
-  const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
-  const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
-  const subjectsForAssignmentForm = mySubjects.filter(s => s.ClassLevel === assignmentForm.classLevel);
-  const subjectsForScoreForm = mySubjects.filter(s => s.ClassLevel === scoreForm.classLevel);
-  const filteredWorks = myAssignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel);
-  const subjectsForReportForm = mySubjects.filter(s => s.ClassLevel === reportForm.classLevel);
-
   const handlePrintReport = (e: any) => {
     e.preventDefault();
     const subjectWorks = myAssignments.filter(a => a.ClassLevel === reportForm.classLevel && a.Subject === reportForm.subject);
@@ -187,10 +185,7 @@ export default function Dashboard() {
     }
 
     let printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert("กรุณาอนุญาต Pop-up เพื่อดูรายงาน");
-      return;
-    }
+    if (!printWindow) { alert("กรุณาอนุญาต Pop-up เพื่อดูรายงาน"); return; }
 
     let html = `
       <!DOCTYPE html>
@@ -209,10 +204,7 @@ export default function Dashboard() {
           th { background-color: #f5f5f5; font-weight: 600; }
           .text-left { text-align: left; }
           .total-col { font-weight: 600; }
-          @media print {
-            @page { margin: 1cm; }
-            body { padding: 0; }
-          }
+          @media print { @page { margin: 1cm; } body { padding: 0; } }
         </style>
       </head>
       <body>
@@ -253,9 +245,7 @@ export default function Dashboard() {
             }).join('')}
           </tbody>
         </table>
-        <script>
-          window.onload = function() { window.print(); }
-        </script>
+        <script>window.onload = function() { window.print(); }</script>
       </body>
       </html>
     `;
@@ -263,58 +253,90 @@ export default function Dashboard() {
     printWindow.document.close();
   };
 
+  const mySubjects = subjects.filter(s => s.TeacherName === teacherName);
+  const myAssignments = assignments.filter(a => a.TeacherName === teacherName);
+  const myScores = scores.filter(sc => sc.TeacherName === teacherName);
+
+  const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
+  const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
+  const subjectsForAssignmentForm = mySubjects.filter(s => s.ClassLevel === assignmentForm.classLevel);
+  const subjectsForScoreForm = mySubjects.filter(s => s.ClassLevel === scoreForm.classLevel);
+  const filteredWorks = myAssignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel);
+  const subjectsForReportForm = mySubjects.filter(s => s.ClassLevel === reportForm.classLevel);
+
+  // --- ชุดสี (Theme Classes) สำหรับสลับโหมด ---
+  const theme = {
+    bg: isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-800",
+    card: isDarkMode ? "bg-gray-800 border-gray-700 shadow-lg" : "bg-white border-gray-100 shadow-sm",
+    input: isDarkMode ? "bg-gray-700 border-gray-600 text-white focus:ring-blue-400 disabled:bg-gray-900 disabled:text-gray-500" : "bg-white border-gray-200 text-gray-800 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400",
+    textMuted: isDarkMode ? "text-gray-400" : "text-gray-500",
+    tableHead: isDarkMode ? "bg-gray-900 text-gray-300 border-gray-700" : "bg-gray-50 text-gray-600 border-gray-200",
+    tableRow: isDarkMode ? "border-gray-700 hover:bg-gray-700/50" : "border-gray-100 hover:bg-gray-50",
+    buttonTabActive: isDarkMode ? "bg-blue-600/20 text-blue-400" : "bg-blue-50 text-blue-700",
+    buttonTabInactive: isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-50 hover:text-gray-700",
+    primaryButton: "w-full bg-blue-600 text-white font-medium rounded-full p-3 hover:bg-blue-700 transition disabled:opacity-50 shadow-md hover:shadow-lg",
+  };
+
+  // ==========================================
+  // โหมดที่ 1: หน้าค้นหาสำหรับนักเรียน (Public)
+  // ==========================================
   if (appMode === 'student') {
     return (
-      <div className="min-h-screen bg-gray-50 p-6 lg:p-10 font-sans">
+      <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 ${theme.bg}`}>
         <div className="max-w-4xl mx-auto space-y-8">
-          <header className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <header className={`flex justify-between items-center p-6 rounded-3xl border transition-colors duration-300 ${theme.card}`}>
             <div>
-              <h1 className="text-2xl font-bold text-blue-700">Krusave Score Hub</h1>
-              <p className="text-gray-500 text-sm mt-1">ระบบตรวจสอบคะแนนออนไลน์</p>
+              <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-blue-400' : 'text-blue-700'}`}>Krusave Score Hub</h1>
+              <p className={`text-sm mt-1 ${theme.textMuted}`}>ระบบตรวจสอบคะแนนออนไลน์</p>
             </div>
-            <button onClick={() => setAppMode('login')} className="text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 py-2.5 px-4 rounded-lg font-medium transition">
-              สำหรับครูผู้สอน
-            </button>
+            <div className="flex items-center gap-3">
+              <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>
+                {isDarkMode ? '🌙' : '☀️'}
+              </button>
+              <button onClick={() => setAppMode('login')} className={`text-sm py-2.5 px-5 rounded-full font-medium transition-colors ${isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>
+                สำหรับครูผู้สอน
+              </button>
+            </div>
           </header>
 
-          <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 text-center">
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">ตรวจสอบคะแนนของฉัน</h2>
-            <p className="text-gray-500 text-sm mb-6">กรอกรหัสนักเรียนเพื่อดูสรุปผลคะแนนงานแต่ละรายวิชา</p>
-            <form onSubmit={handleSearch} className="max-w-md mx-auto flex gap-2">
-              <input type="text" placeholder="พิมพ์รหัสนักเรียนที่นี่..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} required
-                className="flex-1 border border-gray-300 rounded-lg p-3 text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none text-center text-lg" />
-              <button type="submit" disabled={loading} className="bg-blue-600 text-white font-medium rounded-lg px-6 hover:bg-blue-700 transition disabled:opacity-50">
+          <div className={`p-8 rounded-3xl border text-center transition-colors duration-300 ${theme.card}`}>
+            <h2 className="text-xl font-semibold mb-2">ตรวจสอบคะแนนของฉัน</h2>
+            <p className={`text-sm mb-6 ${theme.textMuted}`}>กรอกรหัสนักเรียนเพื่อดูสรุปผลคะแนนงานแต่ละรายวิชา</p>
+            <form onSubmit={handleSearch} className="max-w-md mx-auto flex flex-col sm:flex-row gap-3">
+              <input type="text" placeholder="รหัสนักเรียน..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} required
+                className={`flex-1 border rounded-full px-5 py-3 outline-none text-center sm:text-left text-lg transition-colors ${theme.input}`} />
+              <button type="submit" disabled={loading} className="bg-blue-600 text-white font-medium rounded-full px-8 py-3 hover:bg-blue-700 transition disabled:opacity-50 shadow-md">
                 {loading ? 'รอสักครู่...' : 'ค้นหา'}
               </button>
             </form>
           </div>
 
           {searchedStudent && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100 flex flex-col md:flex-row justify-between md:items-center">
+            <div className={`p-6 rounded-3xl border transition-colors duration-300 ${theme.card}`}>
+              <div className={`mb-6 p-5 rounded-2xl border flex flex-col md:flex-row justify-between md:items-center ${isDarkMode ? 'bg-blue-900/20 border-blue-800/30' : 'bg-blue-50 border-blue-100'}`}>
                 <div>
-                  <h3 className="text-lg font-bold text-gray-800">{searchedStudent.Name}</h3>
-                  <p className="text-gray-600 text-sm">รหัส: {searchedStudent.StudentID} | ระดับชั้น: {searchedStudent.ClassLevel}</p>
+                  <h3 className="text-lg font-bold">{searchedStudent.Name}</h3>
+                  <p className={`text-sm mt-1 ${isDarkMode ? 'text-blue-300' : 'text-gray-600'}`}>รหัส: {searchedStudent.StudentID} | ระดับชั้น: {searchedStudent.ClassLevel}</p>
                 </div>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-gray-100 text-gray-600 text-sm border-b border-gray-200">
-                      <th className="p-3 font-medium w-1/3">รายวิชา</th>
-                      <th className="p-3 font-medium w-1/2">ชิ้นงาน</th>
-                      <th className="p-3 font-medium text-right">คะแนน</th>
+                    <tr className={`text-sm border-b ${theme.tableHead}`}>
+                      <th className="p-4 font-medium w-1/3">รายวิชา</th>
+                      <th className="p-4 font-medium w-1/2">ชิ้นงาน</th>
+                      <th className="p-4 font-medium text-right">คะแนน</th>
                     </tr>
                   </thead>
-                  <tbody className="text-sm text-gray-700">
+                  <tbody className="text-sm">
                     {studentScores.length === 0 ? (
-                      <tr><td colSpan={3} className="text-center p-8 text-gray-500">ยังไม่มีข้อมูลคะแนนในระบบ</td></tr>
+                      <tr><td colSpan={3} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูลคะแนนในระบบ</td></tr>
                     ) : (
                       studentScores.map((row, i) => (
-                        <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="p-3 font-medium text-gray-800">{row.Subject} <span className="text-xs text-blue-500"><br/>(ครู: {row.TeacherName})</span></td>
-                          <td className="p-3 text-gray-600">{row.WorkName}</td>
-                          <td className="p-3 text-right font-bold text-blue-600 text-base">{row.Score}</td>
+                        <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
+                          <td className="p-4 font-medium">{row.Subject} <span className="text-xs text-blue-500"><br/>(ครู: {row.TeacherName})</span></td>
+                          <td className={`p-4 ${theme.textMuted}`}>{row.WorkName}</td>
+                          <td className="p-4 text-right font-bold text-blue-500 text-base">{row.Score}</td>
                         </tr>
                       ))
                     )}
@@ -328,22 +350,32 @@ export default function Dashboard() {
     );
   }
 
+  // ==========================================
+  // โหมดที่ 2: หน้าต่าง Login สำหรับครู
+  // ==========================================
   if (appMode === 'login') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans relative">
-        <button onClick={() => setAppMode('student')} className="absolute top-6 left-6 text-sm text-gray-500 hover:text-gray-800 font-medium">
+      <div className={`min-h-screen flex items-center justify-center p-4 font-sans relative transition-colors duration-300 ${theme.bg}`}>
+        <button onClick={() => setAppMode('student')} className={`absolute top-6 left-6 text-sm font-medium transition-colors ${theme.textMuted} hover:text-blue-500`}>
           ← กลับไปหน้านักเรียน
         </button>
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 w-full max-w-md">
-          <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">เข้าสู่ระบบ</h1>
-          <p className="text-center text-gray-500 text-sm mb-6">สำหรับครูผู้สอนเพื่อจัดการข้อมูล</p>
-          {errorMsg && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4 text-center">{errorMsg}</div>}
-          <form onSubmit={handleLoginSubmit} className="space-y-4">
+        <div className="absolute top-6 right-6">
+          <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>
+            {isDarkMode ? '🌙' : '☀️'}
+          </button>
+        </div>
+        <div className={`p-10 rounded-3xl border w-full max-w-md transition-colors duration-300 ${theme.card}`}>
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold mb-2">เข้าสู่ระบบ</h1>
+            <p className={`text-sm ${theme.textMuted}`}>สำหรับครูผู้สอนเพื่อจัดการข้อมูล</p>
+          </div>
+          {errorMsg && <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-sm mb-6 text-center border border-red-100">{errorMsg}</div>}
+          <form onSubmit={handleLoginSubmit} className="space-y-5">
             <input type="text" placeholder="Username" required onChange={(e) => setLoginData({...loginData, username: e.target.value})}
-              className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none" />
+              className={`w-full border rounded-2xl px-5 py-3.5 outline-none transition-colors ${theme.input}`} />
             <input type="password" placeholder="Password" required onChange={(e) => setLoginData({...loginData, password: e.target.value})}
-              className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none" />
-            <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-medium rounded-lg p-2.5 hover:bg-blue-700 disabled:opacity-50">
+              className={`w-full border rounded-2xl px-5 py-3.5 outline-none transition-colors ${theme.input}`} />
+            <button type="submit" disabled={loading} className={theme.primaryButton}>
               {loading ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}
             </button>
           </form>
@@ -352,189 +384,180 @@ export default function Dashboard() {
     );
   }
 
+  // ==========================================
+  // โหมดที่ 3: หน้าจอ Dashboard หลัก (สำหรับครู)
+  // ==========================================
   return (
-    <div className="min-h-screen bg-gray-50 p-6 lg:p-10 font-sans">
+    <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 ${theme.bg}`}>
       <div className="max-w-6xl mx-auto space-y-6">
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-xl shadow-sm border border-gray-200 gap-4">
+        
+        <header className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 rounded-3xl border gap-4 transition-colors duration-300 ${theme.card}`}>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Krusave Score Hub (Admin)</h1>
-            <p className="text-gray-500 text-sm mt-1">ยินดีต้อนรับ, {teacherName}</p>
+            <h1 className="text-2xl font-bold">Krusave Score Hub <span className="text-blue-500">(Admin)</span></h1>
+            <p className={`text-sm mt-1 ${theme.textMuted}`}>ยินดีต้อนรับ, {teacherName}</p>
           </div>
-          <button onClick={handleLogout} className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 px-4 rounded-lg font-medium transition">
-            ออกจากระบบ
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>
+              {isDarkMode ? '🌙' : '☀️'}
+            </button>
+            <button onClick={handleLogout} className={`text-sm py-2.5 px-5 rounded-full font-medium transition-colors ${isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}>
+              ออกจากระบบ
+            </button>
+          </div>
         </header>
 
-        <div className="flex space-x-1 bg-white p-1 rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+        <div className={`flex space-x-1 p-1.5 rounded-full border overflow-x-auto transition-colors duration-300 ${theme.card}`}>
           {['students', 'subjects', 'assignments', 'scores', 'reports'].map((tab) => (
             <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition whitespace-nowrap ${
-                activeTab === tab ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}>
+              className={`flex-1 py-3 px-4 rounded-full text-sm font-medium transition whitespace-nowrap ${activeTab === tab ? theme.buttonTabActive : theme.buttonTabInactive}`}>
               {tab === 'students' ? '👨‍🎓 นักเรียน' : tab === 'subjects' ? '📖 วิชา' : tab === 'assignments' ? '📚 งาน' : tab === 'scores' ? '📝 คะแนน' : '🖨️ ออกรายงาน'}
             </button>
           ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">
+          <div className={`p-6 rounded-3xl border h-fit transition-colors duration-300 ${theme.card}`}>
+            <h2 className="text-lg font-semibold mb-5">
               {activeTab === 'students' ? 'เพิ่มนักเรียนใหม่' : activeTab === 'subjects' ? 'เพิ่มรายวิชาใหม่' : activeTab === 'assignments' ? 'เพิ่มชิ้นงานใหม่' : activeTab === 'reports' ? 'พิมพ์รายงาน' : 'ให้คะแนนนักเรียน'}
             </h2>
             
             {activeTab === 'students' && (
               <form onSubmit={(e) => { e.preventDefault(); submitData('addStudent', studentForm, () => setStudentForm({studentId:'', name:'', classLevel:''})); }} className="space-y-4">
-                <select required value={studentForm.classLevel} onChange={e => setStudentForm({...studentForm, classLevel: e.target.value})} 
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">-- เลือกระดับชั้น --</option>
-                  <option value="ปวช">ปวช</option>
-                  <option value="ปวส">ปวส</option>
-                  <option value="ป.ตรี">ป.ตรี</option>
+                <select required value={studentForm.classLevel} onChange={e => setStudentForm({...studentForm, classLevel: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
+                  <option value="">-- เลือกระดับชั้น --</option><option value="ปวช">ปวช</option><option value="ปวส">ปวส</option><option value="ป.ตรี">ป.ตรี</option>
                 </select>
-                <input type="text" placeholder="รหัสนักเรียน" value={studentForm.studentId} onChange={e => setStudentForm({...studentForm, studentId: e.target.value})} required className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500" />
-                <input type="text" placeholder="ชื่อ-นามสกุล" value={studentForm.name} onChange={e => setStudentForm({...studentForm, name: e.target.value})} required className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500" />
-                <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-medium rounded-lg p-2.5 hover:bg-blue-700 disabled:opacity-50">บันทึกนักเรียน</button>
+                <input type="text" placeholder="รหัสนักเรียน" value={studentForm.studentId} onChange={e => setStudentForm({...studentForm, studentId: e.target.value})} required className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`} />
+                <input type="text" placeholder="ชื่อ-นามสกุล" value={studentForm.name} onChange={e => setStudentForm({...studentForm, name: e.target.value})} required className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`} />
+                <button type="submit" disabled={loading} className={theme.primaryButton}>บันทึกนักเรียน</button>
               </form>
             )}
 
             {activeTab === 'subjects' && (
               <form onSubmit={(e) => { e.preventDefault(); submitData('addSubject', subjectForm, () => setSubjectForm({classLevel:'', subject:''})); }} className="space-y-4">
-                <select required value={subjectForm.classLevel} onChange={e => setSubjectForm({...subjectForm, classLevel: e.target.value})} 
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">-- เลือกระดับชั้น --</option>
-                  <option value="ปวช">ปวช</option>
-                  <option value="ปวส">ปวส</option>
-                  <option value="ป.ตรี">ป.ตรี</option>
+                <select required value={subjectForm.classLevel} onChange={e => setSubjectForm({...subjectForm, classLevel: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
+                  <option value="">-- เลือกระดับชั้น --</option><option value="ปวช">ปวช</option><option value="ปวส">ปวส</option><option value="ป.ตรี">ป.ตรี</option>
                 </select>
-                <input type="text" placeholder="ชื่อรายวิชา" value={subjectForm.subject} onChange={e => setSubjectForm({...subjectForm, subject: e.target.value})} required className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500" />
-                <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-medium rounded-lg p-2.5 hover:bg-blue-700 disabled:opacity-50">บันทึกรายวิชา</button>
+                <input type="text" placeholder="ชื่อรายวิชา" value={subjectForm.subject} onChange={e => setSubjectForm({...subjectForm, subject: e.target.value})} required className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`} />
+                <button type="submit" disabled={loading} className={theme.primaryButton}>บันทึกรายวิชา</button>
               </form>
             )}
 
             {activeTab === 'assignments' && (
               <form onSubmit={(e) => { e.preventDefault(); submitData('addAssignment', assignmentForm, () => setAssignmentForm({classLevel:'', subject:'', workName:''})); }} className="space-y-4">
-                <select required value={assignmentForm.classLevel} onChange={e => setAssignmentForm({...assignmentForm, classLevel: e.target.value, subject: ''})} 
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">-- เลือกระดับชั้น --</option>
-                  <option value="ปวช">ปวช</option>
-                  <option value="ปวส">ปวส</option>
-                  <option value="ป.ตรี">ป.ตรี</option>
+                <select required value={assignmentForm.classLevel} onChange={e => setAssignmentForm({...assignmentForm, classLevel: e.target.value, subject: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
+                  <option value="">-- เลือกระดับชั้น --</option><option value="ปวช">ปวช</option><option value="ปวส">ปวส</option><option value="ป.ตรี">ป.ตรี</option>
                 </select>
-                <select required value={assignmentForm.subject} disabled={!assignmentForm.classLevel} onChange={e => setAssignmentForm({...assignmentForm, subject: e.target.value})} 
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
+                <select required value={assignmentForm.subject} disabled={!assignmentForm.classLevel} onChange={e => setAssignmentForm({...assignmentForm, subject: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกรายวิชา --</option>
                   {subjectsForAssignmentForm.map((s: any, i) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
                 </select>
-                <input type="text" placeholder="ชื่อชิ้นงาน" value={assignmentForm.workName} onChange={e => setAssignmentForm({...assignmentForm, workName: e.target.value})} required className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500" />
-                <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-medium rounded-lg p-2.5 hover:bg-blue-700 disabled:opacity-50">บันทึกชิ้นงาน</button>
+                <input type="text" placeholder="ชื่อชิ้นงาน" value={assignmentForm.workName} onChange={e => setAssignmentForm({...assignmentForm, workName: e.target.value})} required className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`} />
+                <button type="submit" disabled={loading} className={theme.primaryButton}>บันทึกชิ้นงาน</button>
               </form>
             )}
 
             {activeTab === 'scores' && (
               <form onSubmit={(e) => { e.preventDefault(); submitData('addScore', scoreForm, () => setScoreForm({...scoreForm, score:''})); }} className="space-y-4">
-                <select required value={scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, classLevel: e.target.value, studentId: '', name: '', subject: '', workName: ''})} className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">-- เลือกระดับชั้น --</option>
-                  <option value="ปวช">ปวช</option>
-                  <option value="ปวส">ปวส</option>
-                  <option value="ป.ตรี">ป.ตรี</option>
+                <select required value={scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, classLevel: e.target.value, studentId: '', name: '', subject: '', workName: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
+                  <option value="">-- เลือกระดับชั้น --</option><option value="ปวช">ปวช</option><option value="ปวส">ปวส</option><option value="ป.ตรี">ป.ตรี</option>
                 </select>
                 <select required value={scoreForm.studentId} disabled={!scoreForm.classLevel} onChange={e => {
                   const selectedId = e.target.value;
-                  if (!selectedId) {
-                    setScoreForm({...scoreForm, studentId: '', name: ''});
-                  } else {
-                    const student = students.find(s => String(s.StudentID) === String(selectedId));
-                    if (student) setScoreForm({...scoreForm, studentId: student.StudentID, name: student.Name});
-                  }
-                }} className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
+                  if (!selectedId) { setScoreForm({...scoreForm, studentId: '', name: ''}); } 
+                  else { const student = students.find(s => String(s.StudentID) === String(selectedId)); if (student) setScoreForm({...scoreForm, studentId: student.StudentID, name: student.Name}); }
+                }} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกนักเรียน --</option>
                   {filteredStudents.map((s: any, i) => <option key={i} value={s.StudentID}>{s.StudentID} - {s.Name}</option>)}
                 </select>
-                <select required value={scoreForm.subject} disabled={!scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, subject: e.target.value, workName: ''})} className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
+                <select required value={scoreForm.subject} disabled={!scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, subject: e.target.value, workName: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกรายวิชา --</option>
                   {subjectsForScoreForm.map((s: any, i) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
                 </select>
-                <select required value={scoreForm.workName} disabled={!scoreForm.subject} onChange={e => setScoreForm({...scoreForm, workName: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
+                <select required value={scoreForm.workName} disabled={!scoreForm.subject} onChange={e => setScoreForm({...scoreForm, workName: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกชิ้นงาน --</option>
                   {filteredWorks.map((w: any, i) => <option key={i} value={w.WorkName}>{w.WorkName}</option>)}
                 </select>
-                <input type="number" placeholder="กรอกคะแนนที่ได้" value={scoreForm.score} onChange={e => setScoreForm({...scoreForm, score: e.target.value})} required className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500" />
-                <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-medium rounded-lg p-2.5 hover:bg-blue-700 disabled:opacity-50">บันทึกคะแนน</button>
+                <input type="number" placeholder="กรอกคะแนนที่ได้" value={scoreForm.score} onChange={e => setScoreForm({...scoreForm, score: e.target.value})} required className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`} />
+                <button type="submit" disabled={loading} className={theme.primaryButton}>บันทึกคะแนน</button>
               </form>
             )}
 
             {activeTab === 'reports' && (
               <form onSubmit={handlePrintReport} className="space-y-4">
-                <select required value={reportForm.classLevel} onChange={e => setReportForm({classLevel: e.target.value, subject: ''})} 
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">-- เลือกระดับชั้น --</option>
-                  <option value="ปวช">ปวช</option>
-                  <option value="ปวส">ปวส</option>
-                  <option value="ป.ตรี">ป.ตรี</option>
+                <select required value={reportForm.classLevel} onChange={e => setReportForm({classLevel: e.target.value, subject: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
+                  <option value="">-- เลือกระดับชั้น --</option><option value="ปวช">ปวช</option><option value="ปวส">ปวส</option><option value="ป.ตรี">ป.ตรี</option>
                 </select>
-                <select required value={reportForm.subject} disabled={!reportForm.classLevel} onChange={e => setReportForm({...reportForm, subject: e.target.value})} 
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
+                <select required value={reportForm.subject} disabled={!reportForm.classLevel} onChange={e => setReportForm({...reportForm, subject: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกรายวิชา --</option>
                   {subjectsForReportForm.map((s: any, i) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
                 </select>
-                <button type="submit" disabled={loading} className="w-full bg-green-600 text-white font-medium rounded-lg p-2.5 hover:bg-green-700 flex justify-center items-center gap-2">
-                  <span>ดาวน์โหลด PDF / พิมพ์รายงาน</span>
+                <button type="submit" disabled={loading} className="w-full bg-green-600 text-white font-medium rounded-full p-3 hover:bg-green-700 shadow-md hover:shadow-lg transition">
+                  ดาวน์โหลด PDF / พิมพ์รายงาน
                 </button>
               </form>
             )}
           </div>
 
-          <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">
+          <div className={`lg:col-span-2 p-6 rounded-3xl border transition-colors duration-300 ${theme.card}`}>
+            <h2 className="text-lg font-semibold mb-5">
               {activeTab === 'students' ? 'รายชื่อนักเรียนทั้งหมด (ส่วนกลาง)' : activeTab === 'subjects' ? 'วิชาของฉัน' : activeTab === 'assignments' ? 'ชิ้นงานของฉัน' : activeTab === 'reports' ? 'ตัวอย่างข้อมูลคะแนน' : 'คะแนนล่าสุดของฉัน'}
             </h2>
-            <div className="overflow-x-auto">
+            <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700">
               <table className="w-full text-left border-collapse">
                 {activeTab === 'students' && (
                   <>
-                    <thead><tr className="bg-gray-100 text-gray-600 text-sm border-b"><th className="p-3">ระดับชั้น</th><th className="p-3">รหัสนักเรียน</th><th className="p-3">ชื่อ-นามสกุล</th><th className="p-3 text-center">จัดการ</th></tr></thead>
-                    <tbody className="text-sm text-gray-700">
-                      {students.length === 0 ? <tr><td colSpan={4} className="text-center p-8">ยังไม่มีข้อมูล</td></tr> : 
+                    <thead><tr className={`text-sm border-b ${theme.tableHead}`}><th className="p-4 font-medium">ระดับชั้น</th><th className="p-4 font-medium">รหัสนักเรียน</th><th className="p-4 font-medium">ชื่อ-นามสกุล</th><th className="p-4 font-medium text-center">จัดการ</th></tr></thead>
+                    <tbody className="text-sm">
+                      {students.length === 0 ? <tr><td colSpan={4} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
                         students.map((row, i) => (
-                          <tr key={i} className="border-b hover:bg-gray-50"><td className="p-3">{row.ClassLevel}</td><td className="p-3">{row.StudentID}</td><td className="p-3">{row.Name}</td><td className="p-3 text-center"><button onClick={() => handleDeleteStudent(row.StudentID, row.Name)} className="text-red-500 hover:text-red-700 font-medium py-1 px-2 rounded hover:bg-red-50 transition">ลบ</button></td></tr>
+                          <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
+                            <td className="p-4">{row.ClassLevel}</td><td className="p-4">{row.StudentID}</td><td className="p-4">{row.Name}</td>
+                            <td className="p-4 text-center"><button onClick={() => handleDeleteStudent(row.StudentID, row.Name)} className="text-red-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-red-500 transition">ลบ</button></td>
+                          </tr>
                         ))}
                     </tbody>
                   </>
                 )}
                 {activeTab === 'subjects' && (
                   <>
-                    <thead><tr className="bg-gray-100 text-gray-600 text-sm border-b"><th className="p-3">ระดับชั้น</th><th className="p-3">รายวิชา</th><th className="p-3 text-center">จัดการ</th></tr></thead>
-                    <tbody className="text-sm text-gray-700">
-                      {mySubjects.length === 0 ? <tr><td colSpan={3} className="text-center p-8">ยังไม่มีข้อมูล</td></tr> : 
+                    <thead><tr className={`text-sm border-b ${theme.tableHead}`}><th className="p-4 font-medium">ระดับชั้น</th><th className="p-4 font-medium">รายวิชา</th><th className="p-4 font-medium text-center">จัดการ</th></tr></thead>
+                    <tbody className="text-sm">
+                      {mySubjects.length === 0 ? <tr><td colSpan={3} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
                         mySubjects.map((row, i) => (
-                          <tr key={i} className="border-b hover:bg-gray-50"><td className="p-3">{row.ClassLevel}</td><td className="p-3">{row.Subject}</td><td className="p-3 text-center"><button onClick={() => handleDeleteSubject(row.ClassLevel, row.Subject)} className="text-red-500 hover:text-red-700 font-medium py-1 px-2 rounded hover:bg-red-50 transition">ลบ</button></td></tr>
+                          <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
+                            <td className="p-4">{row.ClassLevel}</td><td className="p-4">{row.Subject}</td>
+                            <td className="p-4 text-center"><button onClick={() => handleDeleteSubject(row.ClassLevel, row.Subject)} className="text-red-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-red-500 transition">ลบ</button></td>
+                          </tr>
                         ))}
                     </tbody>
                   </>
                 )}
                 {activeTab === 'assignments' && (
                   <>
-                    <thead><tr className="bg-gray-100 text-gray-600 text-sm border-b"><th className="p-3">ระดับชั้น</th><th className="p-3">รายวิชา</th><th className="p-3">ชื่อชิ้นงาน</th><th className="p-3 text-center">จัดการ</th></tr></thead>
-                    <tbody className="text-sm text-gray-700">
-                      {myAssignments.length === 0 ? <tr><td colSpan={4} className="text-center p-8">ยังไม่มีข้อมูล</td></tr> : 
+                    <thead><tr className={`text-sm border-b ${theme.tableHead}`}><th className="p-4 font-medium">ระดับชั้น</th><th className="p-4 font-medium">รายวิชา</th><th className="p-4 font-medium">ชื่อชิ้นงาน</th><th className="p-4 font-medium text-center">จัดการ</th></tr></thead>
+                    <tbody className="text-sm">
+                      {myAssignments.length === 0 ? <tr><td colSpan={4} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
                         myAssignments.map((row, i) => (
-                          <tr key={i} className="border-b hover:bg-gray-50"><td className="p-3">{row.ClassLevel}</td><td className="p-3">{row.Subject}</td><td className="p-3">{row.WorkName}</td><td className="p-3 text-center"><button onClick={() => handleDeleteAssignment(row.ClassLevel, row.Subject, row.WorkName)} className="text-red-500 hover:text-red-700 font-medium py-1 px-2 rounded hover:bg-red-50 transition">ลบ</button></td></tr>
+                          <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
+                            <td className="p-4">{row.ClassLevel}</td><td className="p-4">{row.Subject}</td><td className="p-4">{row.WorkName}</td>
+                            <td className="p-4 text-center"><button onClick={() => handleDeleteAssignment(row.ClassLevel, row.Subject, row.WorkName)} className="text-red-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-red-500 transition">ลบ</button></td>
+                          </tr>
                         ))}
                     </tbody>
                   </>
                 )}
                 {(activeTab === 'scores' || activeTab === 'reports') && (
                   <>
-                    <thead><tr className="bg-gray-100 text-gray-600 text-sm border-b whitespace-nowrap"><th className="p-3">ชั้น</th><th className="p-3">ชื่อ</th><th className="p-3">วิชา/ชิ้นงาน</th><th className="p-3 text-right">คะแนน</th>{activeTab === 'scores' && <th className="p-3 text-center">จัดการ</th>}</tr></thead>
-                    <tbody className="text-sm text-gray-700">
-                      {myScores.length === 0 ? <tr><td colSpan={5} className="text-center p-8">ยังไม่มีข้อมูลคะแนน</td></tr> : 
+                    <thead><tr className={`text-sm border-b whitespace-nowrap ${theme.tableHead}`}><th className="p-4 font-medium">ชั้น</th><th className="p-4 font-medium">ชื่อ</th><th className="p-4 font-medium">วิชา/ชิ้นงาน</th><th className="p-4 font-medium text-right">คะแนน</th>{activeTab === 'scores' && <th className="p-4 font-medium text-center">จัดการ</th>}</tr></thead>
+                    <tbody className="text-sm">
+                      {myScores.length === 0 ? <tr><td colSpan={5} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูลคะแนน</td></tr> : 
                         myScores.map((row, i) => (
-                          <tr key={i} className="border-b hover:bg-gray-50">
-                            <td className="p-3 whitespace-nowrap">{row.ClassLevel}</td>
-                            <td className="p-3 whitespace-nowrap">{row.Name}</td>
-                            <td className="p-3 whitespace-nowrap text-gray-500 text-xs"><b>{row.Subject}</b><br/>{row.WorkName}</td>
-                            <td className="p-3 text-right font-semibold text-blue-600 text-base">{row.Score}</td>
-                            {activeTab === 'scores' && <td className="p-3 text-center"><button onClick={() => handleDeleteScore(row.StudentID, row.Name, row.Subject, row.WorkName)} className="text-red-500 hover:text-red-700 font-medium py-1 px-2 rounded hover:bg-red-50 transition">ยกเลิก</button></td>}
+                          <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
+                            <td className="p-4 whitespace-nowrap">{row.ClassLevel}</td>
+                            <td className="p-4 whitespace-nowrap">{row.Name}</td>
+                            <td className={`p-4 whitespace-nowrap text-xs ${theme.textMuted}`}><b>{row.Subject}</b><br/>{row.WorkName}</td>
+                            <td className="p-4 text-right font-bold text-blue-500 text-base">{row.Score}</td>
+                            {activeTab === 'scores' && <td className="p-4 text-center"><button onClick={() => handleDeleteScore(row.StudentID, row.Name, row.Subject, row.WorkName)} className="text-red-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-red-500 transition">ยกเลิก</button></td>}
                           </tr>
                         ))}
                     </tbody>
