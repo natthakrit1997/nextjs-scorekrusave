@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 
 export default function Dashboard() {
-  // นำ Web App URL ของคุณมาวางแทนที่ข้อความด้านล่างนี้
   const API_URL = "https://script.google.com/macros/s/AKfycbwigSuwpf6tU5EOQr6o2Nqk4Di9-WfUNtq69Zhsi2LK-8E7C1MNxBTAQJL63bCignv65A/exec"; 
 
   const [appMode, setAppMode] = useState('student'); 
@@ -14,7 +13,6 @@ export default function Dashboard() {
   
   const [activeTab, setActiveTab] = useState('scores');
   
-  // State ฐานข้อมูล
   const [students, setStudents] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
@@ -24,7 +22,6 @@ export default function Dashboard() {
   const [searchedStudent, setSearchedStudent] = useState<any>(null);
   const [studentScores, setStudentScores] = useState<any[]>([]);
 
-  // State ฟอร์ม
   const [studentForm, setStudentForm] = useState({ studentId: '', name: '', classLevel: '' });
   const [subjectForm, setSubjectForm] = useState({ classLevel: '', subject: '' });
   const [assignmentForm, setAssignmentForm] = useState({ classLevel: '', subject: '', workName: '' });
@@ -119,9 +116,9 @@ export default function Dashboard() {
     setLoading(false);
   };
 
+  // --- ฟังก์ชันจัดการการลบข้อมูลแบบต่างๆ ---
   const handleDeleteStudent = async (studentId: string, studentName: string) => {
-    const isConfirm = window.confirm(`คุณต้องการลบข้อมูลของ:\n"${studentName}" (รหัส: ${studentId})\nใช่หรือไม่?`);
-    if (isConfirm) {
+    if (window.confirm(`คุณต้องการลบข้อมูลนักเรียน:\n"${studentName}" (รหัส: ${studentId})\nใช่หรือไม่?`)) {
       setLoading(true);
       try {
         await fetch(API_URL, {
@@ -130,9 +127,52 @@ export default function Dashboard() {
           headers: { "Content-Type": "text/plain;charset=utf-8" }
         });
         fetchAllData(); 
-      } catch (error) {
-        alert("เกิดข้อผิดพลาดในการลบข้อมูล");
-      }
+      } catch (error) { alert("เกิดข้อผิดพลาดในการลบข้อมูล"); }
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteSubject = async (classLevel: string, subject: string) => {
+    if (window.confirm(`คุณต้องการลบรายวิชา:\n"${subject}" (${classLevel})\nใช่หรือไม่?`)) {
+      setLoading(true);
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          body: JSON.stringify({ action: "deleteSubject", classLevel, subject }),
+          headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        fetchAllData(); 
+      } catch (error) { alert("เกิดข้อผิดพลาดในการลบข้อมูล"); }
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteAssignment = async (classLevel: string, subject: string, workName: string) => {
+    if (window.confirm(`คุณต้องการลบชิ้นงาน:\n"${workName}" วิชา "${subject}" (${classLevel})\nใช่หรือไม่?`)) {
+      setLoading(true);
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          body: JSON.stringify({ action: "deleteAssignment", classLevel, subject, workName }),
+          headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        fetchAllData(); 
+      } catch (error) { alert("เกิดข้อผิดพลาดในการลบข้อมูล"); }
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteScore = async (studentId: string, studentName: string, subject: string, workName: string) => {
+    if (window.confirm(`คุณต้องการยกเลิกคะแนนของ:\n${studentName}\nชิ้นงาน "${workName}" วิชา "${subject}"\nใช่หรือไม่?`)) {
+      setLoading(true);
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          body: JSON.stringify({ action: "deleteScore", studentId, subject, workName }),
+          headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        fetchAllData(); 
+      } catch (error) { alert("เกิดข้อผิดพลาดในการลบข้อมูล"); }
       setLoading(false);
     }
   };
@@ -318,23 +358,18 @@ export default function Dashboard() {
                   <option value="ปวส">ปวส</option>
                   <option value="ป.ตรี">ป.ตรี</option>
                 </select>
-                
-                {/* แก้ไขตรงนี้: เพิ่มการดักจับค่าว่าง (เมื่อครูเลือก "-- เลือกนักเรียน --") และแปลงค่าเป็น String ป้องกัน Error */}
                 <select required value={scoreForm.studentId} disabled={!scoreForm.classLevel} onChange={e => {
                   const selectedId = e.target.value;
                   if (!selectedId) {
                     setScoreForm({...scoreForm, studentId: '', name: ''});
                   } else {
                     const student = students.find(s => String(s.StudentID) === String(selectedId));
-                    if (student) {
-                      setScoreForm({...scoreForm, studentId: student.StudentID, name: student.Name});
-                    }
+                    if (student) setScoreForm({...scoreForm, studentId: student.StudentID, name: student.Name});
                   }
                 }} className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
                   <option value="">-- เลือกนักเรียน --</option>
                   {filteredStudents.map((s: any, i) => <option key={i} value={s.StudentID}>{s.StudentID} - {s.Name}</option>)}
                 </select>
-
                 <select required value={scoreForm.subject} disabled={!scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, subject: e.target.value, workName: ''})} className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
                   <option value="">-- เลือกรายวิชา --</option>
                   {subjectsForScoreForm.map((s: any, i) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
@@ -373,9 +408,7 @@ export default function Dashboard() {
                             <td className="p-3">{row.StudentID}</td>
                             <td className="p-3">{row.Name}</td>
                             <td className="p-3 text-center">
-                              <button onClick={() => handleDeleteStudent(row.StudentID, row.Name)} className="text-red-500 hover:text-red-700 font-medium py-1 px-2 rounded hover:bg-red-50 transition">
-                                ลบ
-                              </button>
+                              <button onClick={() => handleDeleteStudent(row.StudentID, row.Name)} className="text-red-500 hover:text-red-700 font-medium py-1 px-2 rounded hover:bg-red-50 transition">ลบ</button>
                             </td>
                           </tr>
                         ))}
@@ -384,33 +417,74 @@ export default function Dashboard() {
                 )}
                 {activeTab === 'subjects' && (
                   <>
-                    <thead><tr className="bg-gray-100 text-gray-600 text-sm border-b"><th className="p-3">ระดับชั้น</th><th className="p-3">รายวิชา</th></tr></thead>
+                    <thead>
+                      <tr className="bg-gray-100 text-gray-600 text-sm border-b">
+                        <th className="p-3">ระดับชั้น</th>
+                        <th className="p-3">รายวิชา</th>
+                        <th className="p-3 text-center">จัดการ</th>
+                      </tr>
+                    </thead>
                     <tbody className="text-sm text-gray-700">
-                      {subjects.length === 0 ? <tr><td colSpan={2} className="text-center p-8">ยังไม่มีข้อมูล</td></tr> : 
-                        subjects.map((row, i) => <tr key={i} className="border-b hover:bg-gray-50"><td className="p-3">{row.ClassLevel}</td><td className="p-3">{row.Subject}</td></tr>)}
+                      {subjects.length === 0 ? <tr><td colSpan={3} className="text-center p-8">ยังไม่มีข้อมูล</td></tr> : 
+                        subjects.map((row, i) => (
+                          <tr key={i} className="border-b hover:bg-gray-50">
+                            <td className="p-3">{row.ClassLevel}</td>
+                            <td className="p-3">{row.Subject}</td>
+                            <td className="p-3 text-center">
+                              <button onClick={() => handleDeleteSubject(row.ClassLevel, row.Subject)} className="text-red-500 hover:text-red-700 font-medium py-1 px-2 rounded hover:bg-red-50 transition">ลบ</button>
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </>
                 )}
                 {activeTab === 'assignments' && (
                   <>
-                    <thead><tr className="bg-gray-100 text-gray-600 text-sm border-b"><th className="p-3">ระดับชั้น</th><th className="p-3">รายวิชา</th><th className="p-3">ชื่อชิ้นงาน</th></tr></thead>
+                    <thead>
+                      <tr className="bg-gray-100 text-gray-600 text-sm border-b">
+                        <th className="p-3">ระดับชั้น</th>
+                        <th className="p-3">รายวิชา</th>
+                        <th className="p-3">ชื่อชิ้นงาน</th>
+                        <th className="p-3 text-center">จัดการ</th>
+                      </tr>
+                    </thead>
                     <tbody className="text-sm text-gray-700">
-                      {assignments.length === 0 ? <tr><td colSpan={3} className="text-center p-8">ยังไม่มีข้อมูล</td></tr> : 
-                        assignments.map((row, i) => <tr key={i} className="border-b hover:bg-gray-50"><td className="p-3">{row.ClassLevel}</td><td className="p-3">{row.Subject}</td><td className="p-3">{row.WorkName}</td></tr>)}
+                      {assignments.length === 0 ? <tr><td colSpan={4} className="text-center p-8">ยังไม่มีข้อมูล</td></tr> : 
+                        assignments.map((row, i) => (
+                          <tr key={i} className="border-b hover:bg-gray-50">
+                            <td className="p-3">{row.ClassLevel}</td>
+                            <td className="p-3">{row.Subject}</td>
+                            <td className="p-3">{row.WorkName}</td>
+                            <td className="p-3 text-center">
+                              <button onClick={() => handleDeleteAssignment(row.ClassLevel, row.Subject, row.WorkName)} className="text-red-500 hover:text-red-700 font-medium py-1 px-2 rounded hover:bg-red-50 transition">ลบ</button>
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </>
                 )}
                 {activeTab === 'scores' && (
                   <>
-                    <thead><tr className="bg-gray-100 text-gray-600 text-sm border-b whitespace-nowrap"><th className="p-3">ชั้น</th><th className="p-3">ชื่อ</th><th className="p-3">วิชา/ชิ้นงาน</th><th className="p-3 text-right">คะแนน</th></tr></thead>
+                    <thead>
+                      <tr className="bg-gray-100 text-gray-600 text-sm border-b whitespace-nowrap">
+                        <th className="p-3">ชั้น</th>
+                        <th className="p-3">ชื่อ</th>
+                        <th className="p-3">วิชา/ชิ้นงาน</th>
+                        <th className="p-3 text-right">คะแนน</th>
+                        <th className="p-3 text-center">จัดการ</th>
+                      </tr>
+                    </thead>
                     <tbody className="text-sm text-gray-700">
-                      {scores.length === 0 ? <tr><td colSpan={4} className="text-center p-8">ยังไม่มีข้อมูลคะแนน</td></tr> : 
+                      {scores.length === 0 ? <tr><td colSpan={5} className="text-center p-8">ยังไม่มีข้อมูลคะแนน</td></tr> : 
                         scores.map((row, i) => (
                           <tr key={i} className="border-b hover:bg-gray-50">
                             <td className="p-3 whitespace-nowrap">{row.ClassLevel}</td>
                             <td className="p-3 whitespace-nowrap">{row.Name}</td>
                             <td className="p-3 whitespace-nowrap text-gray-500 text-xs"><b>{row.Subject}</b><br/>{row.WorkName}</td>
                             <td className="p-3 text-right font-semibold text-blue-600 text-base">{row.Score}</td>
+                            <td className="p-3 text-center">
+                              <button onClick={() => handleDeleteScore(row.StudentID, row.Name, row.Subject, row.WorkName)} className="text-red-500 hover:text-red-700 font-medium py-1 px-2 rounded hover:bg-red-50 transition">ยกเลิก</button>
+                            </td>
                           </tr>
                         ))}
                     </tbody>
