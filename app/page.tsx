@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 
 export default function Dashboard() {
+  // นำ Web App URL ของคุณมาวางแทนที่ข้อความด้านล่างนี้
   const API_URL = "https://script.google.com/macros/s/AKfycbwigSuwpf6tU5EOQr6o2Nqk4Di9-WfUNtq69Zhsi2LK-8E7C1MNxBTAQJL63bCignv65A/exec"; 
 
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -275,15 +276,12 @@ export default function Dashboard() {
   const handlePrintReport = (e: any) => {
     e.preventDefault();
     const subjectWorks = myAssignments.filter(a => a.ClassLevel === reportForm.classLevel && a.Subject === reportForm.subject);
-    
-    // [อัปเดต] หารหัสนักเรียนทั้งหมดที่มีคะแนนในวิชานี้ เพื่อกรองเฉพาะคนที่ "เรียน" วิชานี้จริงๆ
     const enrolledStudentIds = new Set(
       myScores
         .filter(sc => sc.Subject === reportForm.subject && sc.ClassLevel === reportForm.classLevel)
         .map(sc => String(sc.StudentID))
     );
 
-    // กรองนักเรียนให้เหลือเฉพาะคนที่รหัสตรงกับในวิชานี้
     let subjectStudents = students.filter(s => 
       s.ClassLevel === reportForm.classLevel && enrolledStudentIds.has(String(s.StudentID))
     );
@@ -676,13 +674,14 @@ export default function Dashboard() {
                               className={`w-20 border rounded-xl px-2 py-1 outline-none text-center font-bold text-blue-500 ${theme.input}`} />
                           </div>
                           
-                          <div className="flex overflow-x-auto gap-2 pb-2 pt-1 px-1 snap-x [&::-webkit-scrollbar]:hidden">
+                          {/* [อัปเดต UI] แก้ไขให้เป็น Responsive: แถบเลื่อนแนวนอนบนมือถือ และหักบรรทัดบนคอมพิวเตอร์ */}
+                          <div className="flex overflow-x-auto md:flex-wrap gap-2 pb-4 pt-2 px-1 snap-x md:snap-none [&::-webkit-scrollbar]:hidden md:[&::-webkit-scrollbar]:auto">
                             {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].map(val => (
                               <button
                                 key={val}
                                 type="button"
                                 onClick={() => setMultiScores({...multiScores, [w.WorkName]: String(val)})}
-                                className={`flex-shrink-0 snap-center w-12 h-12 rounded-full font-bold text-lg transition-all duration-200 ${
+                                className={`flex-shrink-0 snap-center w-11 h-11 sm:w-12 sm:h-12 rounded-full font-bold text-base sm:text-lg transition-all duration-200 ${
                                   multiScores[w.WorkName] === String(val) 
                                     ? 'bg-blue-600 text-white shadow-md scale-110' 
                                     : isDarkMode ? 'bg-gray-700 text-gray-300 border border-gray-600' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
