@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 
 export default function Dashboard() {
-  // นำ Web App URL ของคุณมาวางแทนที่ข้อความด้านล่างนี้
   const API_URL = "https://script.google.com/macros/s/AKfycbwigSuwpf6tU5EOQr6o2Nqk4Di9-WfUNtq69Zhsi2LK-8E7C1MNxBTAQJL63bCignv65A/exec"; 
 
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -35,18 +34,15 @@ export default function Dashboard() {
 
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
-  // --- State สำหรับระบบตรวจสอบความเร็วอินเทอร์เน็ต ---
   const [netSpeed, setNetSpeed] = useState<number | null>(null);
   const [isOnline, setIsOnline] = useState<boolean>(true);
 
-  // ตรวจสอบความเร็วเน็ตและสถานะ Online/Offline
   useEffect(() => {
     setIsOnline(navigator.onLine);
     const updateOnlineStatus = () => setIsOnline(navigator.onLine);
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
 
-    // ดึงค่า Network Information API (รองรับใน Chrome, Edge, Android)
     const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
     if (connection) {
       setNetSpeed(connection.downlink);
@@ -64,6 +60,7 @@ export default function Dashboard() {
     }
   }, []);
 
+  // [แก้ไขที่นี่] ดึงคะแนนเก่าขึ้นมาโชว์เมื่อเลือกวิชาและนักเรียน พร้อมแปลงเป็น String เพื่อให้ปุ่มสีแสดงถูกต้อง
   useEffect(() => {
     if (scoreForm.studentId && scoreForm.subject) {
       const works = assignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel && a.TeacherName === teacherName);
@@ -75,7 +72,8 @@ export default function Dashboard() {
           sc.WorkName === w.WorkName &&
           sc.TeacherName === teacherName
         );
-        initialScores[w.WorkName] = existing ? existing.Score : '';
+        // แปลง existing.Score เป็น String เสมอ เพื่อให้ไปตรงกับเงื่อนไขสีปุ่ม (val === String(val))
+        initialScores[w.WorkName] = existing ? String(existing.Score) : '';
       });
       setMultiScores(initialScores);
     } else {
@@ -117,7 +115,6 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
-      // แก้ไขปัญหาโหลดค้าง: บังคับให้หยุดโหลดเสมอไม่ว่าจะเกิดอะไรขึ้น
       setLoading(false);
     }
   };
@@ -189,7 +186,7 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error saving data:", error);
       showToast('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
-      setLoading(false); // กันเหนียวกรณี fetchAllData ไม่ถูกรัน
+      setLoading(false); 
     }
   };
 
@@ -396,11 +393,6 @@ export default function Dashboard() {
     }, {} as Record<string, { teacher: string, scores: any[], total: number }>);
   };
 
-  // ==========================================
-  // Components ส่วนแสดงผลย่อย
-  // ==========================================
-  
-  // ป้ายแสดงสถานะและเครือข่ายอินเทอร์เน็ต
   const NetworkStatus = () => {
     if (!isOnline) return <div className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 bg-red-100 text-red-600 rounded-full border border-red-200"><span className="animate-pulse">🔴</span> ออฟไลน์</div>;
     if (netSpeed === null) return <div className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 bg-green-100 text-green-600 rounded-full border border-green-200">🟢 ออนไลน์</div>;
@@ -441,9 +433,6 @@ export default function Dashboard() {
     );
   };
 
-  // ==========================================
-  // โหมดที่ 1: หน้าค้นหาสำหรับนักเรียน (Public)
-  // ==========================================
   if (appMode === 'student') {
     const groupedScores = getGroupedScores();
     const hasScores = Object.keys(groupedScores).length > 0;
@@ -532,9 +521,6 @@ export default function Dashboard() {
     );
   }
 
-  // ==========================================
-  // โหมดที่ 2: หน้าต่าง Login สำหรับครู
-  // ==========================================
   if (appMode === 'login') {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 font-sans relative transition-colors duration-300 ${theme.bg}`}>
@@ -571,9 +557,6 @@ export default function Dashboard() {
     );
   }
 
-  // ==========================================
-  // โหมดที่ 3: หน้าจอ Dashboard หลัก (สำหรับครู)
-  // ==========================================
   return (
     <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 relative ${theme.bg}`}>
       
