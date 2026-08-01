@@ -26,24 +26,34 @@ export default function Dashboard() {
   const [studentForm, setStudentForm] = useState({ studentId: '', name: '', classLevel: '' });
   const [subjectForm, setSubjectForm] = useState({ classLevel: '', subject: '' });
   const [assignmentForm, setAssignmentForm] = useState({ classLevel: '', subject: '', workName: '' });
-  const [scoreForm, setScoreForm] = useState({ classLevel: '', studentId: '', name: '', subject: '', workName: '', score: '' });
+  
+  // ปรับแบบฟอร์มการให้คะแนน
+  const [scoreForm, setScoreForm] = useState({ classLevel: '', studentId: '', name: '', subject: '' });
+  const [multiScores, setMultiScores] = useState<Record<string, string>>({}); // เก็บค่าคะแนนแต่ละช่อง
   const [reportForm, setReportForm] = useState({ classLevel: '', subject: '' });
 
+  // State สำหรับแจ้งเตือน Popup (Toast)
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  // ดึงคะแนนเก่าขึ้นมาโชว์เมื่อเลือกวิชาและนักเรียน
   useEffect(() => {
-    if (scoreForm.studentId && scoreForm.subject && scoreForm.workName) {
-      const existing = scores.find(sc => 
-        String(sc.StudentID) === String(scoreForm.studentId) && 
-        sc.Subject === scoreForm.subject && 
-        sc.WorkName === scoreForm.workName &&
-        sc.TeacherName === teacherName
-      );
-      if (existing) {
-        setScoreForm(prev => prev.score !== existing.Score ? { ...prev, score: existing.Score } : prev);
-      } else {
-        setScoreForm(prev => ({ ...prev, score: '' }));
-      }
+    if (scoreForm.studentId && scoreForm.subject) {
+      const works = assignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel && a.TeacherName === teacherName);
+      const initialScores: Record<string, string> = {};
+      works.forEach(w => {
+        const existing = scores.find(sc => 
+          String(sc.StudentID) === String(scoreForm.studentId) && 
+          sc.Subject === scoreForm.subject && 
+          sc.WorkName === w.WorkName &&
+          sc.TeacherName === teacherName
+        );
+        initialScores[w.WorkName] = existing ? existing.Score : '';
+      });
+      setMultiScores(initialScores);
+    } else {
+      setMultiScores({});
     }
-  }, [scoreForm.studentId, scoreForm.subject, scoreForm.workName, scores, teacherName]);
+  }, [scoreForm.studentId, scoreForm.subject, scoreForm.classLevel, scores, teacherName, assignments]);
 
   useEffect(() => {
     fetchAllData();
@@ -60,6 +70,11 @@ export default function Dashboard() {
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
     localStorage.setItem('theme', !isDarkMode ? 'dark' : 'light');
+  };
+
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, message: msg, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
 
   const fetchAllData = async () => {
@@ -135,8 +150,53 @@ export default function Dashboard() {
       });
       if (resetForm) resetForm();
       fetchAllData(); 
+      showToast('บันทึกข้อมูลเรียบร้อยแล้ว!', 'success');
     } catch (error) {
       console.error("Error saving data:", error);
+      showToast('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
+    }
+    setLoading(false);
+  };
+
+  // ฟังก์ชันพิเศษสำหรับส่งคะแนนหลายช่องพร้อมกัน
+  const submitMultipleScores = async (e: any) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    // แปลง object multiScores เป็น array
+    const scoresArray = Object.keys(multiScores).map(workName => ({
+      workName,
+      score: multiScores[workName]
+    })).filter(item => item.score !== ""); // เอาเฉพาะช่องที่มีค่า
+
+    if(scoresArray.length === 0) {
+      showToast('กรุณากรอกคะแนนอย่างน้อย 1 ชิ้นงาน', 'error');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify({ 
+          action: "addMultipleScores", 
+          classLevel: scoreForm.classLevel,
+          studentId: scoreForm.studentId,
+          name: scoreForm.name,
+          subject: scoreForm.subject,
+          scores: scoresArray,
+          teacherName 
+        }),
+        headers: { "Content-Type": "text/plain;charset=utf-8" }
+      });
+      
+      fetchAllData(); 
+      showToast('กรอกคะแนนเสร็จสิ้น! ✨', 'success');
+      // เคลียร์ชื่อนักเรียนเพื่อเตรียมกรอกคนต่อไป
+      setScoreForm(prev => ({...prev, studentId: '', name: ''}));
+    } catch (error) {
+      console.error("Error saving scores:", error);
+      showToast('เกิดข้อผิดพลาดในการบันทึกคะแนน', 'error');
     }
     setLoading(false);
   };
@@ -147,7 +207,8 @@ export default function Dashboard() {
       try {
         await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteStudent", studentId: studentId }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
         fetchAllData(); 
-      } catch (error) { alert("เกิดข้อผิดพลาดในการลบข้อมูล"); }
+        showToast('ลบข้อมูลเรียบร้อย', 'success');
+      } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); }
       setLoading(false);
     }
   };
@@ -158,7 +219,8 @@ export default function Dashboard() {
       try {
         await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteSubject", classLevel, subject, teacherName }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
         fetchAllData(); 
-      } catch (error) { alert("เกิดข้อผิดพลาดในการลบข้อมูล"); }
+        showToast('ลบข้อมูลเรียบร้อย', 'success');
+      } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); }
       setLoading(false);
     }
   };
@@ -169,7 +231,8 @@ export default function Dashboard() {
       try {
         await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteAssignment", classLevel, subject, workName, teacherName }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
         fetchAllData(); 
-      } catch (error) { alert("เกิดข้อผิดพลาดในการลบข้อมูล"); }
+        showToast('ลบข้อมูลเรียบร้อย', 'success');
+      } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); }
       setLoading(false);
     }
   };
@@ -180,7 +243,8 @@ export default function Dashboard() {
       try {
         await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteScore", studentId, subject, workName, teacherName }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
         fetchAllData(); 
-      } catch (error) { alert("เกิดข้อผิดพลาดในการลบข้อมูล"); }
+        showToast('ลบข้อมูลเรียบร้อย', 'success');
+      } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); }
       setLoading(false);
     }
   };
@@ -290,22 +354,28 @@ export default function Dashboard() {
     primaryButton: "w-full bg-blue-600 text-white font-medium rounded-full p-3 hover:bg-blue-700 transition disabled:opacity-50 shadow-md hover:shadow-lg",
   };
 
-  // ==========================================
-  // ฟังก์ชันจัดกลุ่มคะแนนนักเรียนตามรายวิชา
-  // ==========================================
   const getGroupedScores = () => {
     return studentScores.reduce((acc, curr) => {
-      if (!acc[curr.Subject]) {
-        acc[curr.Subject] = {
-          teacher: curr.TeacherName,
-          scores: [],
-          total: 0
-        };
-      }
+      if (!acc[curr.Subject]) { acc[curr.Subject] = { teacher: curr.TeacherName, scores: [], total: 0 }; }
       acc[curr.Subject].scores.push(curr);
       acc[curr.Subject].total += Number(curr.Score) || 0;
       return acc;
     }, {} as Record<string, { teacher: string, scores: any[], total: number }>);
+  };
+
+  // ==========================================
+  // ส่วน UI ระบบแจ้งเตือน (Toast Notification)
+  // ==========================================
+  const ToastNotification = () => {
+    if (!toast.show) return null;
+    return (
+      <div className="fixed top-6 right-6 z-50 animate-bounce">
+        <div className={`px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 border ${toast.type === 'success' ? 'bg-green-500 border-green-400 text-white' : 'bg-red-500 border-red-400 text-white'}`}>
+          <span className="text-xl">{toast.type === 'success' ? '✅' : '❌'}</span>
+          <p className="font-medium text-lg">{toast.message}</p>
+        </div>
+      </div>
+    );
   };
 
   // ==========================================
@@ -357,7 +427,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* แสดงผลคะแนนแยกเป็นรายวิชา */}
               {!hasScores ? (
                 <div className={`text-center p-10 rounded-2xl border ${isDarkMode ? 'border-gray-700 text-gray-400' : 'border-gray-200 text-gray-500'}`}>
                   ยังไม่มีข้อมูลคะแนนในระบบสำหรับรหัสนักเรียนนี้
@@ -366,7 +435,6 @@ export default function Dashboard() {
                 <div className="space-y-6">
                   {Object.keys(groupedScores).map((subject: string) => (
                     <div key={subject} className={`overflow-hidden rounded-2xl border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                      {/* หัวการ์ดของแต่ละวิชา */}
                       <div className={`p-4 sm:p-5 flex justify-between items-center border-b ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
                         <div>
                           <h4 className="font-bold text-lg text-blue-500">{subject}</h4>
@@ -377,8 +445,6 @@ export default function Dashboard() {
                           <span className="font-bold text-2xl text-blue-600 dark:text-blue-400">{groupedScores[subject].total}</span>
                         </div>
                       </div>
-                      
-                      {/* ตารางงานในวิชานั้นๆ */}
                       <table className="w-full text-left border-collapse">
                         <tbody className="text-sm">
                           {groupedScores[subject].scores.map((row: any, idx: number) => (
@@ -440,7 +506,11 @@ export default function Dashboard() {
   // โหมดที่ 3: หน้าจอ Dashboard หลัก (สำหรับครู)
   // ==========================================
   return (
-    <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 ${theme.bg}`}>
+    <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 relative ${theme.bg}`}>
+      
+      {/* Component แจ้งเตือนจะถูกเรียกใช้ที่นี่ */}
+      <ToastNotification />
+
       <div className="max-w-6xl mx-auto space-y-6">
         
         <header className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 rounded-3xl border gap-4 transition-colors duration-300 ${theme.card}`}>
@@ -512,11 +582,17 @@ export default function Dashboard() {
             )}
 
             {activeTab === 'scores' && (
-              <form onSubmit={(e) => { e.preventDefault(); submitData('addScore', scoreForm, () => setScoreForm({...scoreForm, score:''})); }} className="space-y-4">
-                <select required value={scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, classLevel: e.target.value, studentId: '', name: '', subject: '', workName: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
+              <form onSubmit={submitMultipleScores} className="space-y-4">
+                <select required value={scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, classLevel: e.target.value, studentId: '', name: '', subject: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกระดับชั้น --</option><option value="ปวช">ปวช</option><option value="ปวส">ปวส</option><option value="ป.ตรี">ป.ตรี</option>
                 </select>
-                <select required value={scoreForm.studentId} disabled={!scoreForm.classLevel} onChange={e => {
+                
+                <select required value={scoreForm.subject} disabled={!scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, subject: e.target.value, studentId: '', name: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
+                  <option value="">-- เลือกรายวิชา --</option>
+                  {subjectsForScoreForm.map((s: any, i: number) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
+                </select>
+
+                <select required value={scoreForm.studentId} disabled={!scoreForm.subject} onChange={e => {
                   const selectedId = e.target.value;
                   if (!selectedId) { setScoreForm({...scoreForm, studentId: '', name: ''}); } 
                   else { const student = students.find(s => String(s.StudentID) === String(selectedId)); if (student) setScoreForm({...scoreForm, studentId: student.StudentID, name: student.Name}); }
@@ -524,16 +600,28 @@ export default function Dashboard() {
                   <option value="">-- เลือกนักเรียน --</option>
                   {filteredStudents.map((s: any, i: number) => <option key={i} value={s.StudentID}>{s.StudentID} - {s.Name}</option>)}
                 </select>
-                <select required value={scoreForm.subject} disabled={!scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, subject: e.target.value, workName: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
-                  <option value="">-- เลือกรายวิชา --</option>
-                  {subjectsForScoreForm.map((s: any, i: number) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
-                </select>
-                <select required value={scoreForm.workName} disabled={!scoreForm.subject} onChange={e => setScoreForm({...scoreForm, workName: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
-                  <option value="">-- เลือกชิ้นงาน --</option>
-                  {filteredWorks.map((w: any, i: number) => <option key={i} value={w.WorkName}>{w.WorkName}</option>)}
-                </select>
-                <input type="number" placeholder="กรอกคะแนนที่ได้" value={scoreForm.score} onChange={e => setScoreForm({...scoreForm, score: e.target.value})} required className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`} />
-                <button type="submit" disabled={loading} className={theme.primaryButton}>บันทึก / อัปเดตคะแนน</button>
+
+                {/* โซนแสดงช่องกรอกคะแนนของทุกชิ้นงานในวิชานั้น */}
+                {scoreForm.studentId && scoreForm.subject ? (
+                  filteredWorks.length > 0 ? (
+                    <div className={`mt-6 p-4 rounded-2xl border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-blue-50/50 border-blue-100'} space-y-3`}>
+                      <p className={`text-sm font-semibold mb-3 ${isDarkMode ? 'text-blue-400' : 'text-blue-700'}`}>คะแนนชิ้นงานทั้งหมด:</p>
+                      {filteredWorks.map((w: any, i: number) => (
+                        <div key={i} className={`flex items-center justify-between gap-4 p-3 rounded-xl border ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200 shadow-sm'}`}>
+                          <label className={`text-sm font-medium truncate w-3/5 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{w.WorkName}</label>
+                          <input type="number" placeholder="คะแนน" value={multiScores[w.WorkName] || ''} onChange={e => setMultiScores({...multiScores, [w.WorkName]: e.target.value})} 
+                            className={`w-24 border rounded-xl px-3 py-2 outline-none text-center font-bold text-blue-500 ${theme.input}`} />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={`mt-4 p-4 text-center rounded-2xl border ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                      ยังไม่มีชิ้นงานในรายวิชานี้ กรุณาเพิ่มชิ้นงานก่อน
+                    </div>
+                  )
+                ) : null}
+
+                <button type="submit" disabled={loading || filteredWorks.length === 0} className={theme.primaryButton}>บันทึก / อัปเดตคะแนนทั้งหมด</button>
               </form>
             )}
 
