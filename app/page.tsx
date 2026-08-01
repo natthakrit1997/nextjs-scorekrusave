@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 
 export default function Dashboard() {
+  // นำ Web App URL ของคุณมาวางแทนที่ข้อความด้านล่างนี้
   const API_URL = "https://script.google.com/macros/s/AKfycbwigSuwpf6tU5EOQr6o2Nqk4Di9-WfUNtq69Zhsi2LK-8E7C1MNxBTAQJL63bCignv65A/exec"; 
 
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -9,8 +10,10 @@ export default function Dashboard() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [teacherName, setTeacherName] = useState('');
   const [loginData, setLoginData] = useState({ username: '', password: '' });
-  const [errorMsg, setErrorMsg] = useState('');
+  
+  // สถานะ Loading ถูกนำมาใช้กับหน้าจอ Overlay แล้ว
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   
   const [activeTab, setActiveTab] = useState('scores');
   
@@ -92,16 +95,20 @@ export default function Dashboard() {
   const handleSearch = (e: any) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-    const foundStudent = students.find(s => String(s.StudentID) === String(searchQuery.trim()));
-    if (foundStudent) {
-      setSearchedStudent(foundStudent);
-      const sScores = scores.filter(sc => String(sc.StudentID) === String(foundStudent.StudentID));
-      setStudentScores(sScores);
-    } else {
-      setSearchedStudent(null);
-      setStudentScores([]);
-      alert("ไม่พบข้อมูลนักเรียน กรุณาตรวจสอบรหัสอีกครั้ง");
-    }
+    setLoading(true);
+    setTimeout(() => {
+      const foundStudent = students.find(s => String(s.StudentID) === String(searchQuery.trim()));
+      if (foundStudent) {
+        setSearchedStudent(foundStudent);
+        const sScores = scores.filter(sc => String(sc.StudentID) === String(foundStudent.StudentID));
+        setStudentScores(sScores);
+      } else {
+        setSearchedStudent(null);
+        setStudentScores([]);
+        alert("ไม่พบข้อมูลนักเรียน กรุณาตรวจสอบรหัสอีกครั้ง");
+      }
+      setLoading(false);
+    }, 500); // ดีเลย์ให้ผู้ใช้เห็นแอนิเมชันนิดหน่อยเพื่อ UX ที่ดี
   };
 
   const handleLoginSubmit = async (e: any) => {
@@ -146,13 +153,13 @@ export default function Dashboard() {
         headers: { "Content-Type": "text/plain;charset=utf-8" }
       });
       if (resetForm) resetForm();
-      fetchAllData(); 
+      await fetchAllData(); 
       showToast('บันทึกข้อมูลเรียบร้อยแล้ว!', 'success');
     } catch (error) {
       console.error("Error saving data:", error);
       showToast('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
     }
-    setLoading(false);
+    // ไม่ต้อง setLoading(false) เพราะ fetchAllData จัดการให้แล้ว
   };
 
   const submitMultipleScores = async (e: any) => {
@@ -185,14 +192,14 @@ export default function Dashboard() {
         headers: { "Content-Type": "text/plain;charset=utf-8" }
       });
       
-      fetchAllData(); 
+      await fetchAllData(); 
       showToast('กรอกคะแนนเสร็จสิ้น! ✨', 'success');
       setScoreForm(prev => ({...prev, studentId: '', name: ''}));
     } catch (error) {
       console.error("Error saving scores:", error);
       showToast('เกิดข้อผิดพลาดในการบันทึกคะแนน', 'error');
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleDeleteStudent = async (studentId: string, studentName: string) => {
@@ -200,10 +207,9 @@ export default function Dashboard() {
       setLoading(true);
       try {
         await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteStudent", studentId: studentId }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
-        fetchAllData(); 
+        await fetchAllData(); 
         showToast('ลบข้อมูลเรียบร้อย', 'success');
-      } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); }
-      setLoading(false);
+      } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); setLoading(false); }
     }
   };
 
@@ -212,10 +218,9 @@ export default function Dashboard() {
       setLoading(true);
       try {
         await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteSubject", classLevel, subject, teacherName }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
-        fetchAllData(); 
+        await fetchAllData(); 
         showToast('ลบข้อมูลเรียบร้อย', 'success');
-      } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); }
-      setLoading(false);
+      } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); setLoading(false); }
     }
   };
 
@@ -224,10 +229,9 @@ export default function Dashboard() {
       setLoading(true);
       try {
         await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteAssignment", classLevel, subject, workName, teacherName }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
-        fetchAllData(); 
+        await fetchAllData(); 
         showToast('ลบข้อมูลเรียบร้อย', 'success');
-      } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); }
-      setLoading(false);
+      } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); setLoading(false); }
     }
   };
 
@@ -236,10 +240,9 @@ export default function Dashboard() {
       setLoading(true);
       try {
         await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteScore", studentId, subject, workName, teacherName }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
-        fetchAllData(); 
+        await fetchAllData(); 
         showToast('ลบข้อมูลเรียบร้อย', 'success');
-      } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); }
-      setLoading(false);
+      } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); setLoading(false); }
     }
   };
 
@@ -329,13 +332,11 @@ export default function Dashboard() {
   const myAssignments = assignments.filter(a => a.TeacherName === teacherName);
   const myScores = scores.filter(sc => sc.TeacherName === teacherName);
 
-  // --- การสลับ Array ให้ข้อมูลล่าสุดอยู่บนสุดสำหรับแสดงผลในตาราง ---
   const tableStudents = [...students].reverse();
   const tableMySubjects = [...mySubjects].reverse();
   const tableMyAssignments = [...myAssignments].reverse();
   const tableMyScores = [...myScores].reverse();
 
-  // ตัวแปรสำหรับ Dropdown ให้ใช้ตามลำดับเดิม (ไม่งั้นตัวเลือกจะสลับไปมาทำให้งงได้)
   const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
   const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
   const subjectsForAssignmentForm = mySubjects.filter(s => s.ClassLevel === assignmentForm.classLevel);
@@ -364,10 +365,13 @@ export default function Dashboard() {
     }, {} as Record<string, { teacher: string, scores: any[], total: number }>);
   };
 
+  // ==========================================
+  // Components แจ้งเตือน และ หน้าจอโหลด (Spinner)
+  // ==========================================
   const ToastNotification = () => {
     if (!toast.show) return null;
     return (
-      <div className="fixed top-6 right-6 z-50 animate-bounce">
+      <div className="fixed top-6 right-6 z-[60] animate-bounce">
         <div className={`px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 border ${toast.type === 'success' ? 'bg-green-500 border-green-400 text-white' : 'bg-red-500 border-red-400 text-white'}`}>
           <span className="text-xl">{toast.type === 'success' ? '✅' : '❌'}</span>
           <p className="font-medium text-lg">{toast.message}</p>
@@ -376,13 +380,30 @@ export default function Dashboard() {
     );
   };
 
+  const FullPageLoader = () => {
+    if (!loading) return null;
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm transition-opacity">
+        <div className={`p-8 rounded-3xl shadow-2xl flex flex-col items-center ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+          <div className="w-14 h-14 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+          <p className={`font-bold text-lg animate-pulse ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>กำลังประมวลผลข้อมูล...</p>
+        </div>
+      </div>
+    );
+  };
+
+  // ==========================================
+  // โหมดที่ 1: หน้าค้นหาสำหรับนักเรียน (Public)
+  // ==========================================
   if (appMode === 'student') {
     const groupedScores = getGroupedScores();
     const hasScores = Object.keys(groupedScores).length > 0;
 
     return (
-      <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 ${theme.bg}`}>
-        <div className="max-w-4xl mx-auto space-y-8">
+      <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 relative ${theme.bg}`}>
+        <FullPageLoader />
+        
+        <div className="max-w-4xl mx-auto space-y-8 relative z-10">
           <header className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 rounded-3xl border gap-4 transition-colors duration-300 ${theme.card}`}>
             <div className="flex items-center gap-4">
               <img src="/logo.png" alt="Logo" className="w-12 h-12 sm:w-14 sm:h-14 object-contain drop-shadow-sm" onError={(e) => e.currentTarget.style.display = 'none'} />
@@ -408,7 +429,7 @@ export default function Dashboard() {
               <input type="text" placeholder="รหัสนักเรียน..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} required
                 className={`flex-1 border rounded-full px-5 py-3 outline-none text-center sm:text-left text-lg transition-colors ${theme.input}`} />
               <button type="submit" disabled={loading} className="bg-blue-600 text-white font-medium rounded-full px-8 py-3 hover:bg-blue-700 transition disabled:opacity-50 shadow-md">
-                {loading ? 'รอสักครู่...' : 'ค้นหา'}
+                ค้นหา
               </button>
             </form>
           </div>
@@ -461,9 +482,14 @@ export default function Dashboard() {
     );
   }
 
+  // ==========================================
+  // โหมดที่ 2: หน้าต่าง Login สำหรับครู
+  // ==========================================
   if (appMode === 'login') {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 font-sans relative transition-colors duration-300 ${theme.bg}`}>
+        <FullPageLoader />
+        
         <button onClick={() => setAppMode('student')} className={`absolute top-6 left-6 text-sm font-medium transition-colors ${theme.textMuted} hover:text-blue-500`}>
           ← กลับไปหน้านักเรียน
         </button>
@@ -473,7 +499,7 @@ export default function Dashboard() {
           </button>
         </div>
         
-        <div className={`p-10 rounded-3xl border w-full max-w-md transition-colors duration-300 ${theme.card}`}>
+        <div className={`p-10 rounded-3xl border w-full max-w-md transition-colors duration-300 relative z-10 ${theme.card}`}>
           <div className="text-center mb-8">
             <img src="/logo.png" alt="Logo" className="w-20 h-20 sm:w-24 sm:h-24 object-contain mx-auto mb-4 drop-shadow-md" onError={(e) => e.currentTarget.style.display = 'none'} />
             <h1 className="text-3xl font-bold mb-2">เข้าสู่ระบบ</h1>
@@ -486,7 +512,7 @@ export default function Dashboard() {
             <input type="password" placeholder="Password" required onChange={(e) => setLoginData({...loginData, password: e.target.value})}
               className={`w-full border rounded-2xl px-5 py-3.5 outline-none transition-colors ${theme.input}`} />
             <button type="submit" disabled={loading} className={theme.primaryButton}>
-              {loading ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}
+              เข้าสู่ระบบ
             </button>
           </form>
         </div>
@@ -494,11 +520,17 @@ export default function Dashboard() {
     );
   }
 
+  // ==========================================
+  // โหมดที่ 3: หน้าจอ Dashboard หลัก (สำหรับครู)
+  // ==========================================
   return (
     <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 relative ${theme.bg}`}>
+      
       <ToastNotification />
+      <FullPageLoader />
 
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6 relative z-10">
+        
         <header className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 rounded-3xl border gap-4 transition-colors duration-300 ${theme.card}`}>
           <div className="flex items-center gap-4">
             <img src="/logo.png" alt="Logo" className="w-12 h-12 sm:w-14 sm:h-14 object-contain drop-shadow-sm" onError={(e) => e.currentTarget.style.display = 'none'} />
@@ -587,15 +619,38 @@ export default function Dashboard() {
                   {filteredStudents.map((s: any, i: number) => <option key={i} value={s.StudentID}>{s.StudentID} - {s.Name}</option>)}
                 </select>
 
+                {/* โซนให้คะแนนด้วยการ Tap (Mobile First UX) */}
                 {scoreForm.studentId && scoreForm.subject ? (
                   filteredWorks.length > 0 ? (
-                    <div className={`mt-6 p-4 rounded-2xl border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-blue-50/50 border-blue-100'} space-y-3`}>
-                      <p className={`text-sm font-semibold mb-3 ${isDarkMode ? 'text-blue-400' : 'text-blue-700'}`}>คะแนนชิ้นงานทั้งหมด:</p>
+                    <div className="mt-6 space-y-4">
                       {filteredWorks.map((w: any, i: number) => (
-                        <div key={i} className={`flex items-center justify-between gap-4 p-3 rounded-xl border ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200 shadow-sm'}`}>
-                          <label className={`text-sm font-medium truncate w-3/5 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{w.WorkName}</label>
-                          <input type="number" placeholder="คะแนน" value={multiScores[w.WorkName] || ''} onChange={e => setMultiScores({...multiScores, [w.WorkName]: e.target.value})} 
-                            className={`w-24 border rounded-xl px-3 py-2 outline-none text-center font-bold text-blue-500 ${theme.input}`} />
+                        <div key={i} className={`flex flex-col gap-3 p-4 rounded-2xl border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                          
+                          <div className="flex justify-between items-center">
+                            <label className={`text-sm font-bold truncate ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{w.WorkName}</label>
+                            {/* ช่องกรอกมือเผื่อกรณีต้องการพิมพ์ */}
+                            <input type="number" placeholder="กรอกเอง" value={multiScores[w.WorkName] || ''} onChange={e => setMultiScores({...multiScores, [w.WorkName]: e.target.value})} 
+                              className={`w-20 border rounded-xl px-2 py-1 outline-none text-center font-bold text-blue-500 ${theme.input}`} />
+                          </div>
+                          
+                          {/* แถบปุ่มกดคะแนน 0-20 แบบเลื่อนซ้ายขวาได้ */}
+                          <div className="flex overflow-x-auto gap-2 pb-2 pt-1 px-1 snap-x [&::-webkit-scrollbar]:hidden">
+                            {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].map(val => (
+                              <button
+                                key={val}
+                                type="button"
+                                onClick={() => setMultiScores({...multiScores, [w.WorkName]: String(val)})}
+                                className={`flex-shrink-0 snap-center w-12 h-12 rounded-full font-bold text-lg transition-all duration-200 ${
+                                  multiScores[w.WorkName] === String(val) 
+                                    ? 'bg-blue-600 text-white shadow-md scale-110' 
+                                    : isDarkMode ? 'bg-gray-700 text-gray-300 border border-gray-600' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
+                                }`}
+                              >
+                                {val}
+                              </button>
+                            ))}
+                          </div>
+
                         </div>
                       ))}
                     </div>
@@ -606,7 +661,9 @@ export default function Dashboard() {
                   )
                 ) : null}
 
-                <button type="submit" disabled={loading || filteredWorks.length === 0} className={theme.primaryButton}>บันทึก / อัปเดตคะแนนทั้งหมด</button>
+                <div className="pt-4">
+                  <button type="submit" disabled={loading || filteredWorks.length === 0} className={theme.primaryButton}>บันทึก / อัปเดตคะแนนทั้งหมด</button>
+                </div>
               </form>
             )}
 
