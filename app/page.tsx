@@ -60,7 +60,6 @@ export default function Dashboard() {
     }
   }, []);
 
-  // [แก้ไขที่นี่] ดึงคะแนนเก่าขึ้นมาโชว์เมื่อเลือกวิชาและนักเรียน พร้อมแปลงเป็น String เพื่อให้ปุ่มสีแสดงถูกต้อง
   useEffect(() => {
     if (scoreForm.studentId && scoreForm.subject) {
       const works = assignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel && a.TeacherName === teacherName);
@@ -72,7 +71,6 @@ export default function Dashboard() {
           sc.WorkName === w.WorkName &&
           sc.TeacherName === teacherName
         );
-        // แปลง existing.Score เป็น String เสมอ เพื่อให้ไปตรงกับเงื่อนไขสีปุ่ม (val === String(val))
         initialScores[w.WorkName] = existing ? String(existing.Score) : '';
       });
       setMultiScores(initialScores);
@@ -277,11 +275,23 @@ export default function Dashboard() {
   const handlePrintReport = (e: any) => {
     e.preventDefault();
     const subjectWorks = myAssignments.filter(a => a.ClassLevel === reportForm.classLevel && a.Subject === reportForm.subject);
-    let subjectStudents = students.filter(s => s.ClassLevel === reportForm.classLevel);
+    
+    // [อัปเดต] หารหัสนักเรียนทั้งหมดที่มีคะแนนในวิชานี้ เพื่อกรองเฉพาะคนที่ "เรียน" วิชานี้จริงๆ
+    const enrolledStudentIds = new Set(
+      myScores
+        .filter(sc => sc.Subject === reportForm.subject && sc.ClassLevel === reportForm.classLevel)
+        .map(sc => String(sc.StudentID))
+    );
+
+    // กรองนักเรียนให้เหลือเฉพาะคนที่รหัสตรงกับในวิชานี้
+    let subjectStudents = students.filter(s => 
+      s.ClassLevel === reportForm.classLevel && enrolledStudentIds.has(String(s.StudentID))
+    );
+    
     subjectStudents.sort((a, b) => String(a.StudentID).localeCompare(String(b.StudentID)));
 
     if (subjectStudents.length === 0) {
-      alert("ไม่พบข้อมูลนักเรียนในระดับชั้นนี้");
+      alert("ไม่พบรายชื่อนักเรียนในวิชานี้ (กรุณากรอกคะแนนอย่างน้อย 1 ชิ้นงานเพื่อดึงรายชื่อ)");
       return;
     }
 
