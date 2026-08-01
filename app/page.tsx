@@ -261,24 +261,14 @@ export default function Dashboard() {
     }
   };
 
-  // --- ฟังก์ชันแก้ไขชื่อชิ้นงาน ---
   const handleEditAssignment = async (classLevel: string, subject: string, oldWorkName: string) => {
     const newWorkName = window.prompt(`แก้ไขชื่อชิ้นงาน "${oldWorkName}" เป็น:`, oldWorkName);
-    
-    // ตรวจสอบว่ามีการกรอกค่าใหม่ และไม่เป็นค่าว่าง และไม่ซ้ำกับชื่อเดิม
     if (newWorkName && newWorkName.trim() !== "" && newWorkName.trim() !== oldWorkName) {
       setLoading(true);
       try {
         await fetch(API_URL, {
           method: "POST",
-          body: JSON.stringify({ 
-            action: "editAssignment", 
-            classLevel, 
-            subject, 
-            oldWorkName, 
-            newWorkName: newWorkName.trim(), 
-            teacherName 
-          }),
+          body: JSON.stringify({ action: "editAssignment", classLevel, subject, oldWorkName, newWorkName: newWorkName.trim(), teacherName }),
           headers: { "Content-Type": "text/plain;charset=utf-8" }
         });
         await fetchAllData(); 
@@ -305,15 +295,10 @@ export default function Dashboard() {
     e.preventDefault();
     const subjectWorks = myAssignments.filter(a => a.ClassLevel === reportForm.classLevel && a.Subject === reportForm.subject);
     const enrolledStudentIds = new Set(
-      myScores
-        .filter(sc => sc.Subject === reportForm.subject && sc.ClassLevel === reportForm.classLevel)
-        .map(sc => String(sc.StudentID))
+      myScores.filter(sc => sc.Subject === reportForm.subject && sc.ClassLevel === reportForm.classLevel).map(sc => String(sc.StudentID))
     );
 
-    let subjectStudents = students.filter(s => 
-      s.ClassLevel === reportForm.classLevel && enrolledStudentIds.has(String(s.StudentID))
-    );
-    
+    let subjectStudents = students.filter(s => s.ClassLevel === reportForm.classLevel && enrolledStudentIds.has(String(s.StudentID)));
     subjectStudents.sort((a, b) => String(a.StudentID).localeCompare(String(b.StudentID)));
 
     if (subjectStudents.length === 0) {
@@ -400,6 +385,15 @@ export default function Dashboard() {
   const tableMySubjects = [...mySubjects].reverse();
   const tableMyAssignments = [...myAssignments].reverse();
   const tableMyScores = [...myScores].reverse();
+
+  // --- [อัปเดตฟีเจอร์] ระบบกรองชิ้นงานในตารางให้ตรงกับวิชาที่เลือกในเมนูด้านซ้าย ---
+  const filteredTableAssignments = tableMyAssignments.filter(a => {
+    // ถ้ามีการเลือกระดับชั้นในฟอร์ม ให้กรองตามระดับชั้น
+    if (assignmentForm.classLevel && a.ClassLevel !== assignmentForm.classLevel) return false;
+    // ถ้ามีการเลือกวิชาในฟอร์ม ให้กรองตามวิชา
+    if (assignmentForm.subject && a.Subject !== assignmentForm.subject) return false;
+    return true;
+  });
 
   const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
   const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
@@ -753,7 +747,12 @@ export default function Dashboard() {
 
           <div className={`lg:col-span-2 p-6 rounded-3xl border transition-colors duration-300 ${theme.card}`}>
             <h2 className="text-lg font-semibold mb-5">
-              {activeTab === 'students' ? 'รายชื่อนักเรียนทั้งหมด (ส่วนกลาง)' : activeTab === 'subjects' ? 'วิชาของฉัน' : activeTab === 'assignments' ? 'ชิ้นงานของฉัน' : activeTab === 'reports' ? 'ตัวอย่างข้อมูลคะแนน' : 'คะแนนล่าสุดของฉัน'}
+              {/* เปลี่ยนหัวข้อตารางให้สัมพันธ์กับเมนูทางซ้าย */}
+              {activeTab === 'students' ? 'รายชื่อนักเรียนทั้งหมด (ส่วนกลาง)' 
+               : activeTab === 'subjects' ? 'วิชาของฉัน' 
+               : activeTab === 'assignments' ? (assignmentForm.subject ? `ชิ้นงานของวิชา: ${assignmentForm.subject}` : 'ชิ้นงานทั้งหมดของฉัน')
+               : activeTab === 'reports' ? 'ตัวอย่างข้อมูลคะแนน' 
+               : 'คะแนนล่าสุดของฉัน'}
             </h2>
             <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700">
               <table className="w-full text-left border-collapse">
@@ -789,8 +788,8 @@ export default function Dashboard() {
                   <>
                     <thead><tr className={`text-sm border-b ${theme.tableHead}`}><th className="p-4 font-medium">ระดับชั้น</th><th className="p-4 font-medium">รายวิชา</th><th className="p-4 font-medium">ชื่อชิ้นงาน</th><th className="p-4 font-medium text-center w-32">จัดการ</th></tr></thead>
                     <tbody className="text-sm">
-                      {tableMyAssignments.length === 0 ? <tr><td colSpan={4} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
-                        tableMyAssignments.map((row: any, i: number) => (
+                      {filteredTableAssignments.length === 0 ? <tr><td colSpan={4} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
+                        filteredTableAssignments.map((row: any, i: number) => (
                           <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
                             <td className="p-4">{row.ClassLevel}</td><td className="p-4">{row.Subject}</td><td className="p-4">{row.WorkName}</td>
                             <td className="p-4 text-center">
