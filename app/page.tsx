@@ -386,12 +386,24 @@ export default function Dashboard() {
   const tableMyAssignments = [...myAssignments].reverse();
   const tableMyScores = [...myScores].reverse();
 
-  // --- [อัปเดตฟีเจอร์] ระบบกรองชิ้นงานในตารางให้ตรงกับวิชาที่เลือกในเมนูด้านซ้าย ---
+  // --- ระบบกรองข้อมูลตาราง (Contextual Filtering) ---
   const filteredTableAssignments = tableMyAssignments.filter(a => {
-    // ถ้ามีการเลือกระดับชั้นในฟอร์ม ให้กรองตามระดับชั้น
     if (assignmentForm.classLevel && a.ClassLevel !== assignmentForm.classLevel) return false;
-    // ถ้ามีการเลือกวิชาในฟอร์ม ให้กรองตามวิชา
     if (assignmentForm.subject && a.Subject !== assignmentForm.subject) return false;
+    return true;
+  });
+
+  // [อัปเดตใหม่] ระบบกรองตารางคะแนน ให้สัมพันธ์กับหน้า "คะแนน" และหน้า "ออกรายงาน"
+  const filteredTableScores = tableMyScores.filter(sc => {
+    if (activeTab === 'scores') {
+      if (scoreForm.classLevel && sc.ClassLevel !== scoreForm.classLevel) return false;
+      if (scoreForm.subject && sc.Subject !== scoreForm.subject) return false;
+      // ถ้าระบุตัวเด็กด้วย ก็กรองให้เหลือแต่เด็กคนนั้นเลย
+      if (scoreForm.studentId && String(sc.StudentID) !== String(scoreForm.studentId)) return false;
+    } else if (activeTab === 'reports') {
+      if (reportForm.classLevel && sc.ClassLevel !== reportForm.classLevel) return false;
+      if (reportForm.subject && sc.Subject !== reportForm.subject) return false;
+    }
     return true;
   });
 
@@ -751,8 +763,8 @@ export default function Dashboard() {
               {activeTab === 'students' ? 'รายชื่อนักเรียนทั้งหมด (ส่วนกลาง)' 
                : activeTab === 'subjects' ? 'วิชาของฉัน' 
                : activeTab === 'assignments' ? (assignmentForm.subject ? `ชิ้นงานของวิชา: ${assignmentForm.subject}` : 'ชิ้นงานทั้งหมดของฉัน')
-               : activeTab === 'reports' ? 'ตัวอย่างข้อมูลคะแนน' 
-               : 'คะแนนล่าสุดของฉัน'}
+               : activeTab === 'reports' ? (reportForm.subject ? `ตัวอย่างคะแนนวิชา: ${reportForm.subject}` : 'ตัวอย่างข้อมูลคะแนน') 
+               : (scoreForm.subject ? `คะแนนของวิชา: ${scoreForm.subject}` : 'คะแนนล่าสุดของฉัน')}
             </h2>
             <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700">
               <table className="w-full text-left border-collapse">
@@ -807,8 +819,8 @@ export default function Dashboard() {
                   <>
                     <thead><tr className={`text-sm border-b whitespace-nowrap ${theme.tableHead}`}><th className="p-4 font-medium">ชั้น</th><th className="p-4 font-medium">ชื่อ</th><th className="p-4 font-medium">วิชา/ชิ้นงาน</th><th className="p-4 font-medium text-right">คะแนน</th>{activeTab === 'scores' && <th className="p-4 font-medium text-center">จัดการ</th>}</tr></thead>
                     <tbody className="text-sm">
-                      {tableMyScores.length === 0 ? <tr><td colSpan={5} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูลคะแนน</td></tr> : 
-                        tableMyScores.map((row: any, i: number) => (
+                      {filteredTableScores.length === 0 ? <tr><td colSpan={5} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูลคะแนน</td></tr> : 
+                        filteredTableScores.map((row: any, i: number) => (
                           <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
                             <td className="p-4 whitespace-nowrap">{row.ClassLevel}</td>
                             <td className="p-4 whitespace-nowrap">{row.Name}</td>
