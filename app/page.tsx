@@ -11,7 +11,6 @@ export default function Dashboard() {
   const [teacherName, setTeacherName] = useState('');
   const [loginData, setLoginData] = useState({ username: '', password: '' });
   
-  // สถานะ Loading ถูกนำมาใช้กับหน้าจอ Overlay แล้ว
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   
@@ -35,6 +34,35 @@ export default function Dashboard() {
   const [reportForm, setReportForm] = useState({ classLevel: '', subject: '' });
 
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  // --- State สำหรับระบบตรวจสอบความเร็วอินเทอร์เน็ต ---
+  const [netSpeed, setNetSpeed] = useState<number | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+
+  // ตรวจสอบความเร็วเน็ตและสถานะ Online/Offline
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+    const updateOnlineStatus = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+
+    // ดึงค่า Network Information API (รองรับใน Chrome, Edge, Android)
+    const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+    if (connection) {
+      setNetSpeed(connection.downlink);
+      const updateSpeed = () => setNetSpeed(connection.downlink);
+      connection.addEventListener('change', updateSpeed);
+      return () => {
+        connection.removeEventListener('change', updateSpeed);
+        window.removeEventListener('online', updateOnlineStatus);
+        window.removeEventListener('offline', updateOnlineStatus);
+      }
+    }
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+    }
+  }, []);
 
   useEffect(() => {
     if (scoreForm.studentId && scoreForm.subject) {
@@ -88,8 +116,10 @@ export default function Dashboard() {
       setAssignments(data.assignments || []);
     } catch (error) {
       console.error("Error fetching data:", error);
+    } finally {
+      // แก้ไขปัญหาโหลดค้าง: บังคับให้หยุดโหลดเสมอไม่ว่าจะเกิดอะไรขึ้น
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSearch = (e: any) => {
@@ -108,7 +138,7 @@ export default function Dashboard() {
         alert("ไม่พบข้อมูลนักเรียน กรุณาตรวจสอบรหัสอีกครั้ง");
       }
       setLoading(false);
-    }, 500); // ดีเลย์ให้ผู้ใช้เห็นแอนิเมชันนิดหน่อยเพื่อ UX ที่ดี
+    }, 500); 
   };
 
   const handleLoginSubmit = async (e: any) => {
@@ -132,8 +162,9 @@ export default function Dashboard() {
       }
     } catch (error) {
       setErrorMsg("ไม่สามารถเชื่อมต่อฐานข้อมูลได้");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleLogout = () => {
@@ -158,8 +189,8 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error saving data:", error);
       showToast('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
+      setLoading(false); // กันเหนียวกรณี fetchAllData ไม่ถูกรัน
     }
-    // ไม่ต้อง setLoading(false) เพราะ fetchAllData จัดการให้แล้ว
   };
 
   const submitMultipleScores = async (e: any) => {
@@ -366,8 +397,26 @@ export default function Dashboard() {
   };
 
   // ==========================================
-  // Components แจ้งเตือน และ หน้าจอโหลด (Spinner)
+  // Components ส่วนแสดงผลย่อย
   // ==========================================
+  
+  // ป้ายแสดงสถานะและเครือข่ายอินเทอร์เน็ต
+  const NetworkStatus = () => {
+    if (!isOnline) return <div className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 bg-red-100 text-red-600 rounded-full border border-red-200"><span className="animate-pulse">🔴</span> ออฟไลน์</div>;
+    if (netSpeed === null) return <div className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 bg-green-100 text-green-600 rounded-full border border-green-200">🟢 ออนไลน์</div>;
+    
+    let colorStyle = isDarkMode ? "bg-green-900/30 text-green-400 border-gray-700" : "bg-green-50 text-green-600 border-green-200";
+    let icon = "🟢";
+    if (netSpeed < 1) { colorStyle = isDarkMode ? "bg-red-900/30 text-red-400 border-gray-700" : "bg-red-50 text-red-600 border-red-200"; icon = "🔴"; }
+    else if (netSpeed < 5) { colorStyle = isDarkMode ? "bg-yellow-900/30 text-yellow-500 border-gray-700" : "bg-yellow-50 text-yellow-600 border-yellow-200"; icon = "🟡"; }
+
+    return (
+      <div className={`flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-full border transition-colors ${colorStyle}`}>
+        <span>{icon}</span> {netSpeed} Mbps
+      </div>
+    );
+  };
+
   const ToastNotification = () => {
     if (!toast.show) return null;
     return (
@@ -384,7 +433,7 @@ export default function Dashboard() {
     if (!loading) return null;
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm transition-opacity">
-        <div className={`p-8 rounded-3xl shadow-2xl flex flex-col items-center ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+        <div className={`p-8 rounded-3xl shadow-2xl flex flex-col items-center border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-white'}`}>
           <div className="w-14 h-14 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
           <p className={`font-bold text-lg animate-pulse ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>กำลังประมวลผลข้อมูล...</p>
         </div>
@@ -413,10 +462,11 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <NetworkStatus />
               <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>
                 {isDarkMode ? '🌙' : '☀️'}
               </button>
-              <button onClick={() => setAppMode('login')} className={`text-sm py-2.5 px-5 rounded-full font-medium transition-colors ${isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>
+              <button onClick={() => setAppMode('login')} className={`text-sm py-2 px-4 rounded-full font-medium transition-colors ${isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>
                 สำหรับครูผู้สอน
               </button>
             </div>
@@ -493,7 +543,8 @@ export default function Dashboard() {
         <button onClick={() => setAppMode('student')} className={`absolute top-6 left-6 text-sm font-medium transition-colors ${theme.textMuted} hover:text-blue-500`}>
           ← กลับไปหน้านักเรียน
         </button>
-        <div className="absolute top-6 right-6">
+        <div className="absolute top-6 right-6 flex items-center gap-3">
+          <NetworkStatus />
           <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>
             {isDarkMode ? '🌙' : '☀️'}
           </button>
@@ -540,10 +591,11 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <NetworkStatus />
             <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>
               {isDarkMode ? '🌙' : '☀️'}
             </button>
-            <button onClick={handleLogout} className={`text-sm py-2.5 px-5 rounded-full font-medium transition-colors ${isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}>
+            <button onClick={handleLogout} className={`text-sm py-2 px-4 rounded-full font-medium transition-colors ${isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}>
               ออกจากระบบ
             </button>
           </div>
@@ -619,7 +671,6 @@ export default function Dashboard() {
                   {filteredStudents.map((s: any, i: number) => <option key={i} value={s.StudentID}>{s.StudentID} - {s.Name}</option>)}
                 </select>
 
-                {/* โซนให้คะแนนด้วยการ Tap (Mobile First UX) */}
                 {scoreForm.studentId && scoreForm.subject ? (
                   filteredWorks.length > 0 ? (
                     <div className="mt-6 space-y-4">
@@ -628,12 +679,10 @@ export default function Dashboard() {
                           
                           <div className="flex justify-between items-center">
                             <label className={`text-sm font-bold truncate ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{w.WorkName}</label>
-                            {/* ช่องกรอกมือเผื่อกรณีต้องการพิมพ์ */}
                             <input type="number" placeholder="กรอกเอง" value={multiScores[w.WorkName] || ''} onChange={e => setMultiScores({...multiScores, [w.WorkName]: e.target.value})} 
                               className={`w-20 border rounded-xl px-2 py-1 outline-none text-center font-bold text-blue-500 ${theme.input}`} />
                           </div>
                           
-                          {/* แถบปุ่มกดคะแนน 0-20 แบบเลื่อนซ้ายขวาได้ */}
                           <div className="flex overflow-x-auto gap-2 pb-2 pt-1 px-1 snap-x [&::-webkit-scrollbar]:hidden">
                             {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].map(val => (
                               <button
