@@ -27,15 +27,12 @@ export default function Dashboard() {
   const [subjectForm, setSubjectForm] = useState({ classLevel: '', subject: '' });
   const [assignmentForm, setAssignmentForm] = useState({ classLevel: '', subject: '', workName: '' });
   
-  // ปรับแบบฟอร์มการให้คะแนน
   const [scoreForm, setScoreForm] = useState({ classLevel: '', studentId: '', name: '', subject: '' });
-  const [multiScores, setMultiScores] = useState<Record<string, string>>({}); // เก็บค่าคะแนนแต่ละช่อง
+  const [multiScores, setMultiScores] = useState<Record<string, string>>({}); 
   const [reportForm, setReportForm] = useState({ classLevel: '', subject: '' });
 
-  // State สำหรับแจ้งเตือน Popup (Toast)
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
-  // ดึงคะแนนเก่าขึ้นมาโชว์เมื่อเลือกวิชาและนักเรียน
   useEffect(() => {
     if (scoreForm.studentId && scoreForm.subject) {
       const works = assignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel && a.TeacherName === teacherName);
@@ -158,16 +155,14 @@ export default function Dashboard() {
     setLoading(false);
   };
 
-  // ฟังก์ชันพิเศษสำหรับส่งคะแนนหลายช่องพร้อมกัน
   const submitMultipleScores = async (e: any) => {
     e.preventDefault();
     setLoading(true);
     
-    // แปลง object multiScores เป็น array
     const scoresArray = Object.keys(multiScores).map(workName => ({
       workName,
       score: multiScores[workName]
-    })).filter(item => item.score !== ""); // เอาเฉพาะช่องที่มีค่า
+    })).filter(item => item.score !== "");
 
     if(scoresArray.length === 0) {
       showToast('กรุณากรอกคะแนนอย่างน้อย 1 ชิ้นงาน', 'error');
@@ -192,7 +187,6 @@ export default function Dashboard() {
       
       fetchAllData(); 
       showToast('กรอกคะแนนเสร็จสิ้น! ✨', 'success');
-      // เคลียร์ชื่อนักเรียนเพื่อเตรียมกรอกคนต่อไป
       setScoreForm(prev => ({...prev, studentId: '', name: ''}));
     } catch (error) {
       console.error("Error saving scores:", error);
@@ -335,6 +329,13 @@ export default function Dashboard() {
   const myAssignments = assignments.filter(a => a.TeacherName === teacherName);
   const myScores = scores.filter(sc => sc.TeacherName === teacherName);
 
+  // --- การสลับ Array ให้ข้อมูลล่าสุดอยู่บนสุดสำหรับแสดงผลในตาราง ---
+  const tableStudents = [...students].reverse();
+  const tableMySubjects = [...mySubjects].reverse();
+  const tableMyAssignments = [...myAssignments].reverse();
+  const tableMyScores = [...myScores].reverse();
+
+  // ตัวแปรสำหรับ Dropdown ให้ใช้ตามลำดับเดิม (ไม่งั้นตัวเลือกจะสลับไปมาทำให้งงได้)
   const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
   const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
   const subjectsForAssignmentForm = mySubjects.filter(s => s.ClassLevel === assignmentForm.classLevel);
@@ -363,9 +364,6 @@ export default function Dashboard() {
     }, {} as Record<string, { teacher: string, scores: any[], total: number }>);
   };
 
-  // ==========================================
-  // ส่วน UI ระบบแจ้งเตือน (Toast Notification)
-  // ==========================================
   const ToastNotification = () => {
     if (!toast.show) return null;
     return (
@@ -378,9 +376,6 @@ export default function Dashboard() {
     );
   };
 
-  // ==========================================
-  // โหมดที่ 1: หน้าค้นหาสำหรับนักเรียน (Public)
-  // ==========================================
   if (appMode === 'student') {
     const groupedScores = getGroupedScores();
     const hasScores = Object.keys(groupedScores).length > 0;
@@ -466,9 +461,6 @@ export default function Dashboard() {
     );
   }
 
-  // ==========================================
-  // โหมดที่ 2: หน้าต่าง Login สำหรับครู
-  // ==========================================
   if (appMode === 'login') {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 font-sans relative transition-colors duration-300 ${theme.bg}`}>
@@ -502,17 +494,11 @@ export default function Dashboard() {
     );
   }
 
-  // ==========================================
-  // โหมดที่ 3: หน้าจอ Dashboard หลัก (สำหรับครู)
-  // ==========================================
   return (
     <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 relative ${theme.bg}`}>
-      
-      {/* Component แจ้งเตือนจะถูกเรียกใช้ที่นี่ */}
       <ToastNotification />
 
       <div className="max-w-6xl mx-auto space-y-6">
-        
         <header className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 rounded-3xl border gap-4 transition-colors duration-300 ${theme.card}`}>
           <div className="flex items-center gap-4">
             <img src="/logo.png" alt="Logo" className="w-12 h-12 sm:w-14 sm:h-14 object-contain drop-shadow-sm" onError={(e) => e.currentTarget.style.display = 'none'} />
@@ -601,7 +587,6 @@ export default function Dashboard() {
                   {filteredStudents.map((s: any, i: number) => <option key={i} value={s.StudentID}>{s.StudentID} - {s.Name}</option>)}
                 </select>
 
-                {/* โซนแสดงช่องกรอกคะแนนของทุกชิ้นงานในวิชานั้น */}
                 {scoreForm.studentId && scoreForm.subject ? (
                   filteredWorks.length > 0 ? (
                     <div className={`mt-6 p-4 rounded-2xl border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-blue-50/50 border-blue-100'} space-y-3`}>
@@ -651,8 +636,8 @@ export default function Dashboard() {
                   <>
                     <thead><tr className={`text-sm border-b ${theme.tableHead}`}><th className="p-4 font-medium">ระดับชั้น</th><th className="p-4 font-medium">รหัสนักเรียน</th><th className="p-4 font-medium">ชื่อ-นามสกุล</th><th className="p-4 font-medium text-center">จัดการ</th></tr></thead>
                     <tbody className="text-sm">
-                      {students.length === 0 ? <tr><td colSpan={4} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
-                        students.map((row: any, i: number) => (
+                      {tableStudents.length === 0 ? <tr><td colSpan={4} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
+                        tableStudents.map((row: any, i: number) => (
                           <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
                             <td className="p-4">{row.ClassLevel}</td><td className="p-4">{row.StudentID}</td><td className="p-4">{row.Name}</td>
                             <td className="p-4 text-center"><button onClick={() => handleDeleteStudent(row.StudentID, row.Name)} className="text-red-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-red-500 transition">ลบ</button></td>
@@ -665,8 +650,8 @@ export default function Dashboard() {
                   <>
                     <thead><tr className={`text-sm border-b ${theme.tableHead}`}><th className="p-4 font-medium">ระดับชั้น</th><th className="p-4 font-medium">รายวิชา</th><th className="p-4 font-medium text-center">จัดการ</th></tr></thead>
                     <tbody className="text-sm">
-                      {mySubjects.length === 0 ? <tr><td colSpan={3} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
-                        mySubjects.map((row: any, i: number) => (
+                      {tableMySubjects.length === 0 ? <tr><td colSpan={3} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
+                        tableMySubjects.map((row: any, i: number) => (
                           <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
                             <td className="p-4">{row.ClassLevel}</td><td className="p-4">{row.Subject}</td>
                             <td className="p-4 text-center"><button onClick={() => handleDeleteSubject(row.ClassLevel, row.Subject)} className="text-red-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-red-500 transition">ลบ</button></td>
@@ -679,8 +664,8 @@ export default function Dashboard() {
                   <>
                     <thead><tr className={`text-sm border-b ${theme.tableHead}`}><th className="p-4 font-medium">ระดับชั้น</th><th className="p-4 font-medium">รายวิชา</th><th className="p-4 font-medium">ชื่อชิ้นงาน</th><th className="p-4 font-medium text-center">จัดการ</th></tr></thead>
                     <tbody className="text-sm">
-                      {myAssignments.length === 0 ? <tr><td colSpan={4} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
-                        myAssignments.map((row: any, i: number) => (
+                      {tableMyAssignments.length === 0 ? <tr><td colSpan={4} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
+                        tableMyAssignments.map((row: any, i: number) => (
                           <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
                             <td className="p-4">{row.ClassLevel}</td><td className="p-4">{row.Subject}</td><td className="p-4">{row.WorkName}</td>
                             <td className="p-4 text-center"><button onClick={() => handleDeleteAssignment(row.ClassLevel, row.Subject, row.WorkName)} className="text-red-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-red-500 transition">ลบ</button></td>
@@ -693,8 +678,8 @@ export default function Dashboard() {
                   <>
                     <thead><tr className={`text-sm border-b whitespace-nowrap ${theme.tableHead}`}><th className="p-4 font-medium">ชั้น</th><th className="p-4 font-medium">ชื่อ</th><th className="p-4 font-medium">วิชา/ชิ้นงาน</th><th className="p-4 font-medium text-right">คะแนน</th>{activeTab === 'scores' && <th className="p-4 font-medium text-center">จัดการ</th>}</tr></thead>
                     <tbody className="text-sm">
-                      {myScores.length === 0 ? <tr><td colSpan={5} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูลคะแนน</td></tr> : 
-                        myScores.map((row: any, i: number) => (
+                      {tableMyScores.length === 0 ? <tr><td colSpan={5} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูลคะแนน</td></tr> : 
+                        tableMyScores.map((row: any, i: number) => (
                           <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
                             <td className="p-4 whitespace-nowrap">{row.ClassLevel}</td>
                             <td className="p-4 whitespace-nowrap">{row.Name}</td>
