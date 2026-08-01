@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 
 export default function Dashboard() {
-  // นำ Web App URL ของคุณมาวางแทนที่ข้อความด้านล่างนี้
   const API_URL = "https://script.google.com/macros/s/AKfycbwigSuwpf6tU5EOQr6o2Nqk4Di9-WfUNtq69Zhsi2LK-8E7C1MNxBTAQJL63bCignv65A/exec"; 
 
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -259,6 +258,35 @@ export default function Dashboard() {
         await fetchAllData(); 
         showToast('ลบข้อมูลเรียบร้อย', 'success');
       } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); setLoading(false); }
+    }
+  };
+
+  // --- ฟังก์ชันแก้ไขชื่อชิ้นงาน ---
+  const handleEditAssignment = async (classLevel: string, subject: string, oldWorkName: string) => {
+    const newWorkName = window.prompt(`แก้ไขชื่อชิ้นงาน "${oldWorkName}" เป็น:`, oldWorkName);
+    
+    // ตรวจสอบว่ามีการกรอกค่าใหม่ และไม่เป็นค่าว่าง และไม่ซ้ำกับชื่อเดิม
+    if (newWorkName && newWorkName.trim() !== "" && newWorkName.trim() !== oldWorkName) {
+      setLoading(true);
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          body: JSON.stringify({ 
+            action: "editAssignment", 
+            classLevel, 
+            subject, 
+            oldWorkName, 
+            newWorkName: newWorkName.trim(), 
+            teacherName 
+          }),
+          headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        await fetchAllData(); 
+        showToast('อัปเดตชื่อชิ้นงานเรียบร้อยแล้ว', 'success');
+      } catch (error) { 
+        showToast('เกิดข้อผิดพลาดในการแก้ไขข้อมูล', 'error'); 
+        setLoading(false); 
+      }
     }
   };
 
@@ -674,7 +702,6 @@ export default function Dashboard() {
                               className={`w-20 border rounded-xl px-2 py-1 outline-none text-center font-bold text-blue-500 ${theme.input}`} />
                           </div>
                           
-                          {/* [อัปเดต UI] แก้ไขให้เป็น Responsive: แถบเลื่อนแนวนอนบนมือถือ และหักบรรทัดบนคอมพิวเตอร์ */}
                           <div className="flex overflow-x-auto md:flex-wrap gap-2 pb-4 pt-2 px-1 snap-x md:snap-none [&::-webkit-scrollbar]:hidden md:[&::-webkit-scrollbar]:auto">
                             {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].map(val => (
                               <button
@@ -760,13 +787,18 @@ export default function Dashboard() {
                 )}
                 {activeTab === 'assignments' && (
                   <>
-                    <thead><tr className={`text-sm border-b ${theme.tableHead}`}><th className="p-4 font-medium">ระดับชั้น</th><th className="p-4 font-medium">รายวิชา</th><th className="p-4 font-medium">ชื่อชิ้นงาน</th><th className="p-4 font-medium text-center">จัดการ</th></tr></thead>
+                    <thead><tr className={`text-sm border-b ${theme.tableHead}`}><th className="p-4 font-medium">ระดับชั้น</th><th className="p-4 font-medium">รายวิชา</th><th className="p-4 font-medium">ชื่อชิ้นงาน</th><th className="p-4 font-medium text-center w-32">จัดการ</th></tr></thead>
                     <tbody className="text-sm">
                       {tableMyAssignments.length === 0 ? <tr><td colSpan={4} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
                         tableMyAssignments.map((row: any, i: number) => (
                           <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
                             <td className="p-4">{row.ClassLevel}</td><td className="p-4">{row.Subject}</td><td className="p-4">{row.WorkName}</td>
-                            <td className="p-4 text-center"><button onClick={() => handleDeleteAssignment(row.ClassLevel, row.Subject, row.WorkName)} className="text-red-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-red-500 transition">ลบ</button></td>
+                            <td className="p-4 text-center">
+                              <div className="flex justify-center items-center gap-2">
+                                <button onClick={() => handleEditAssignment(row.ClassLevel, row.Subject, row.WorkName)} className="text-blue-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-blue-500 transition">แก้ไข</button>
+                                <button onClick={() => handleDeleteAssignment(row.ClassLevel, row.Subject, row.WorkName)} className="text-red-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-red-500 transition">ลบ</button>
+                              </div>
+                            </td>
                           </tr>
                         ))}
                     </tbody>
