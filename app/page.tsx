@@ -26,21 +26,22 @@ export default function Dashboard() {
 
   const [studentForm, setStudentForm] = useState({ studentId: '', name: '', classLevel: '' });
   const [subjectForm, setSubjectForm] = useState({ classLevel: '', subject: '' });
-  const [assignmentForm, setAssignmentForm] = useState({ classLevel: '', subject: '', workName: '' });
+  // [อัปเดต] เพิ่มช่อง maxScore (คะแนนเก็บ)
+  const [assignmentForm, setAssignmentForm] = useState({ classLevel: '', subject: '', workName: '', maxScore: '' });
   
-  // โหมดให้คะแนนแบบรายบุคคล
   const [scoreForm, setScoreForm] = useState({ classLevel: '', studentId: '', name: '', subject: '' });
   const [multiScores, setMultiScores] = useState<Record<string, string>>({}); 
+  
+  // [อัปเดต] ตัวแปรเก็บ "คะแนนเต็มตอนตรวจ" สำหรับการเทียบบัญญัติไตรยางศ์
+  const [rawMaxScores, setRawMaxScores] = useState<Record<string, string>>({}); 
 
-  // [อัปเดต] โหมดให้คะแนนแบบกลุ่ม
   const [scoreMode, setScoreMode] = useState<'individual' | 'group'>('individual');
   const [groupScoreForm, setGroupScoreForm] = useState({ classLevel: '', subject: '', workName: '', score: '' });
+  const [groupRawMaxScore, setGroupRawMaxScore] = useState(''); // คะแนนเต็มตอนตรวจโหมดกลุ่ม
   const [selectedStudents, setSelectedStudents] = useState<any[]>([]);
 
   const [reportForm, setReportForm] = useState({ classLevel: '', subject: '' });
-
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
-
   const [netSpeed, setNetSpeed] = useState<number | null>(null);
   const [isOnline, setIsOnline] = useState<boolean>(true);
 
@@ -67,11 +68,13 @@ export default function Dashboard() {
     }
   }, []);
 
-  // ดึงคะแนนเก่า (โหมดรายคน)
+  // โหลดคะแนนเก่าและตั้งค่าเริ่มต้นคะแนนเต็ม
   useEffect(() => {
     if (scoreMode === 'individual' && scoreForm.studentId && scoreForm.subject) {
       const works = assignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel && a.TeacherName === teacherName);
       const initialScores: Record<string, string> = {};
+      const initialRawMax: Record<string, string> = {};
+      
       works.forEach(w => {
         const existing = scores.find(sc => 
           String(sc.StudentID) === String(scoreForm.studentId) && 
@@ -80,10 +83,14 @@ export default function Dashboard() {
           sc.TeacherName === teacherName
         );
         initialScores[w.WorkName] = existing ? String(existing.Score) : '';
+        // ตั้งค่าเริ่มต้นของคะแนนเต็มดิบ ให้เท่ากับคะแนนเก็บของชิ้นงาน (ค่าเริ่มต้นคือ 10 หากไม่มีข้อมูล)
+        initialRawMax[w.WorkName] = w.MaxScore ? String(w.MaxScore) : '10'; 
       });
       setMultiScores(initialScores);
+      setRawMaxScores(initialRawMax);
     } else {
       setMultiScores({});
+      setRawMaxScores({});
     }
   }, [scoreForm.studentId, scoreForm.subject, scoreForm.classLevel, scores, teacherName, assignments, scoreMode]);
 
@@ -195,11 +202,25 @@ export default function Dashboard() {
     }
   };
 
-  // Submit แบบรายบุคคล
+  // Submit แบบรายบุคคล พร้อมระบบแปลงคะแนน
   const submitMultipleScores = async (e: any) => {
     e.preventDefault();
     setLoading(true);
-    const scoresArray = Object.keys(multiScores).map(workName => ({ workName, score: multiScores[workName] })).filter(item => item.score !== "");
+    
+    const scoresArray = Object.keys(multiScores).map(workName => {
+      const rawValStr = multiScores[workName];
+      if (rawValStr === "") return null;
+      
+      // การคำนวณเทียบบัญญัติไตรยางศ์
+      const w = filteredWorks.find(wx => wx.WorkName === workName);
+      const maxScore = Number(w?.MaxScore || 10); // คะแนนเก็บ
+      const rawMax = Number(rawMaxScores[workName] || maxScore); // คะแนนเต็มที่กรอก
+      const rawVal = Number(rawValStr); // คะแนนที่ได้
+      
+      const finalScore = rawMax > 0 ? Number(((rawVal / rawMax) * maxScore).toFixed(2)) : rawVal;
+      
+      return { workName, score: String(finalScore) };
+    }).filter(item => item !== null);
 
     if(scoresArray.length === 0) { showToast('กรุณากรอกคะแนนอย่างน้อย 1 ชิ้นงาน', 'error'); setLoading(false); return; }
 
@@ -210,18 +231,25 @@ export default function Dashboard() {
         headers: { "Content-Type": "text/plain;charset=utf-8" }
       });
       await fetchAllData(); 
-      showToast('กรอกคะแนนเสร็จสิ้น! ✨', 'success');
+      showToast('บันทึกและแปลงคะแนนเสร็จสิ้น! ✨', 'success');
       setScoreForm(prev => ({...prev, studentId: '', name: ''}));
     } catch (error) { showToast('เกิดข้อผิดพลาดในการบันทึกคะแนน', 'error'); setLoading(false); }
   };
 
-  // Submit แบบรายกลุ่ม
+  // Submit แบบรายกลุ่ม พร้อมระบบแปลงคะแนน
   const submitGroupScores = async (e: any) => {
     e.preventDefault();
     if (selectedStudents.length === 0) { showToast('กรุณาเลือกนักเรียนอย่างน้อย 1 คน', 'error'); return; }
     if (!groupScoreForm.score) { showToast('กรุณากรอกคะแนน', 'error'); return; }
     
     setLoading(true);
+    
+    const w = groupWorks.find(gw => gw.WorkName === groupScoreForm.workName);
+    const maxScore = Number(w?.MaxScore || 10);
+    const rawMax = Number(groupRawMaxScore || maxScore);
+    const rawVal = Number(groupScoreForm.score);
+    const finalScore = rawMax > 0 ? Number(((rawVal / rawMax) * maxScore).toFixed(2)) : rawVal;
+
     try {
       await fetch(API_URL, {
         method: "POST",
@@ -230,16 +258,16 @@ export default function Dashboard() {
           classLevel: groupScoreForm.classLevel, 
           subject: groupScoreForm.subject, 
           workName: groupScoreForm.workName, 
-          score: groupScoreForm.score, 
+          score: String(finalScore), 
           students: selectedStudents.map(s => ({ id: s.StudentID, name: s.Name })), 
           teacherName 
         }),
         headers: { "Content-Type": "text/plain;charset=utf-8" }
       });
       await fetchAllData(); 
-      showToast('บันทึกคะแนนกลุ่มเสร็จสิ้น! ✨', 'success');
-      setSelectedStudents([]); // เคลียร์รายชื่อที่เลือก
-      setGroupScoreForm(prev => ({...prev, score: ''})); // เคลียร์คะแนน
+      showToast('บันทึกและแปลงคะแนนกลุ่มเสร็จสิ้น! ✨', 'success');
+      setSelectedStudents([]); 
+      setGroupScoreForm(prev => ({...prev, score: ''})); 
     } catch (error) { showToast('เกิดข้อผิดพลาดในการบันทึกคะแนน', 'error'); } 
     finally { setLoading(false); }
   };
@@ -249,8 +277,7 @@ export default function Dashboard() {
       setLoading(true);
       try {
         await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteStudent", studentId: studentId }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
-        await fetchAllData(); 
-        showToast('ลบข้อมูลเรียบร้อย', 'success');
+        await fetchAllData(); showToast('ลบข้อมูลเรียบร้อย', 'success');
       } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); setLoading(false); }
     }
   };
@@ -260,8 +287,7 @@ export default function Dashboard() {
       setLoading(true);
       try {
         await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteSubject", classLevel, subject, teacherName }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
-        await fetchAllData(); 
-        showToast('ลบข้อมูลเรียบร้อย', 'success');
+        await fetchAllData(); showToast('ลบข้อมูลเรียบร้อย', 'success');
       } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); setLoading(false); }
     }
   };
@@ -271,8 +297,7 @@ export default function Dashboard() {
       setLoading(true);
       try {
         await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteAssignment", classLevel, subject, workName, teacherName }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
-        await fetchAllData(); 
-        showToast('ลบข้อมูลเรียบร้อย', 'success');
+        await fetchAllData(); showToast('ลบข้อมูลเรียบร้อย', 'success');
       } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); setLoading(false); }
     }
   };
@@ -287,8 +312,7 @@ export default function Dashboard() {
           body: JSON.stringify({ action: "editAssignment", classLevel, subject, oldWorkName, newWorkName: newWorkName.trim(), teacherName }),
           headers: { "Content-Type": "text/plain;charset=utf-8" }
         });
-        await fetchAllData(); 
-        showToast('อัปเดตชื่อชิ้นงานเรียบร้อยแล้ว', 'success');
+        await fetchAllData(); showToast('อัปเดตชื่อชิ้นงานเรียบร้อยแล้ว', 'success');
       } catch (error) { showToast('เกิดข้อผิดพลาดในการแก้ไขข้อมูล', 'error'); setLoading(false); }
     }
   };
@@ -298,8 +322,7 @@ export default function Dashboard() {
       setLoading(true);
       try {
         await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "deleteScore", studentId, subject, workName, teacherName }), headers: { "Content-Type": "text/plain;charset=utf-8" } });
-        await fetchAllData(); 
-        showToast('ลบข้อมูลเรียบร้อย', 'success');
+        await fetchAllData(); showToast('ลบข้อมูลเรียบร้อย', 'success');
       } catch (error) { showToast('เกิดข้อผิดพลาด', 'error'); setLoading(false); }
     }
   };
@@ -423,9 +446,6 @@ export default function Dashboard() {
     return true;
   });
 
-  const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
-  
-  // กรองตามฟอร์ม
   const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
   const filteredGroupStudents = students.filter(s => s.ClassLevel === groupScoreForm.classLevel);
   const groupWorks = myAssignments.filter(a => a.Subject === groupScoreForm.subject && a.ClassLevel === groupScoreForm.classLevel);
@@ -436,7 +456,6 @@ export default function Dashboard() {
   const filteredWorks = myAssignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel);
   const subjectsForReportForm = mySubjects.filter(s => s.ClassLevel === reportForm.classLevel);
 
-  // Toggle การเลือกนักเรียนแบบกลุ่ม
   const handleToggleStudent = (student: any) => {
     if (selectedStudents.some(s => s.StudentID === student.StudentID)) {
       setSelectedStudents(selectedStudents.filter(s => s.StudentID !== student.StudentID));
@@ -444,10 +463,19 @@ export default function Dashboard() {
       setSelectedStudents([...selectedStudents, student]);
     }
   };
+  
   const handleSelectAllStudents = () => {
     if (selectedStudents.length === filteredGroupStudents.length) setSelectedStudents([]);
     else setSelectedStudents([...filteredGroupStudents]);
   };
+
+  // โหลดค่าคะแนนเต็มให้โหมดกลุ่มอัตโนมัติ
+  useEffect(() => {
+    if (scoreMode === 'group' && groupScoreForm.workName) {
+      const w = groupWorks.find(gw => gw.WorkName === groupScoreForm.workName);
+      setGroupRawMaxScore(w?.MaxScore ? String(w.MaxScore) : '10');
+    }
+  }, [groupScoreForm.workName, groupWorks, scoreMode]);
 
   const theme = {
     bg: isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-800",
@@ -473,16 +501,12 @@ export default function Dashboard() {
   const NetworkStatus = () => {
     if (!isOnline) return <div className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 bg-red-100 text-red-600 rounded-full border border-red-200"><span className="animate-pulse">🔴</span> ออฟไลน์</div>;
     if (netSpeed === null) return <div className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 bg-green-100 text-green-600 rounded-full border border-green-200">🟢 ออนไลน์</div>;
-    
     let colorStyle = isDarkMode ? "bg-green-900/30 text-green-400 border-gray-700" : "bg-green-50 text-green-600 border-green-200";
     let icon = "🟢";
     if (netSpeed < 1) { colorStyle = isDarkMode ? "bg-red-900/30 text-red-400 border-gray-700" : "bg-red-50 text-red-600 border-red-200"; icon = "🔴"; }
     else if (netSpeed < 5) { colorStyle = isDarkMode ? "bg-yellow-900/30 text-yellow-500 border-gray-700" : "bg-yellow-50 text-yellow-600 border-yellow-200"; icon = "🟡"; }
-
     return (
-      <div className={`flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-full border transition-colors ${colorStyle}`}>
-        <span>{icon}</span> {netSpeed} Mbps
-      </div>
+      <div className={`flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-full border transition-colors ${colorStyle}`}><span>{icon}</span> {netSpeed} Mbps</div>
     );
   };
 
@@ -510,15 +534,12 @@ export default function Dashboard() {
     );
   };
 
-  // UI หน้าต่างๆ เหมือนเดิม ขอข้ามมาที่ Admin เลย
   if (appMode === 'student') {
     const groupedScores = getGroupedScores();
     const hasScores = Object.keys(groupedScores).length > 0;
-
     return (
       <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 relative ${theme.bg}`}>
         <FullPageLoader />
-        
         <div className="max-w-4xl mx-auto space-y-8 relative z-10">
           <header className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 rounded-3xl border gap-4 transition-colors duration-300 ${theme.card}`}>
             <div className="flex items-center gap-4">
@@ -530,27 +551,18 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-3">
               <NetworkStatus />
-              <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>
-                {isDarkMode ? '🌙' : '☀️'}
-              </button>
-              <button onClick={() => setAppMode('login')} className={`text-sm py-2 px-4 rounded-full font-medium transition-colors ${isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>
-                สำหรับครูผู้สอน
-              </button>
+              <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>{isDarkMode ? '🌙' : '☀️'}</button>
+              <button onClick={() => setAppMode('login')} className={`text-sm py-2 px-4 rounded-full font-medium transition-colors ${isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>สำหรับครูผู้สอน</button>
             </div>
           </header>
-
           <div className={`p-8 rounded-3xl border text-center transition-colors duration-300 ${theme.card}`}>
             <h2 className="text-xl font-semibold mb-2">ตรวจสอบคะแนนของฉัน</h2>
             <p className={`text-sm mb-6 ${theme.textMuted}`}>กรอกรหัสนักเรียนเพื่อดูสรุปผลคะแนนแยกตามรายวิชา</p>
             <form onSubmit={handleSearch} className="max-w-md mx-auto flex flex-col sm:flex-row gap-3">
-              <input type="text" placeholder="รหัสนักเรียน..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} required
-                className={`flex-1 border rounded-full px-5 py-3 outline-none text-center sm:text-left text-lg transition-colors ${theme.input}`} />
-              <button type="submit" disabled={loading} className="bg-blue-600 text-white font-medium rounded-full px-8 py-3 hover:bg-blue-700 transition disabled:opacity-50 shadow-md">
-                ค้นหา
-              </button>
+              <input type="text" placeholder="รหัสนักเรียน..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} required className={`flex-1 border rounded-full px-5 py-3 outline-none text-center sm:text-left text-lg transition-colors ${theme.input}`} />
+              <button type="submit" disabled={loading} className="bg-blue-600 text-white font-medium rounded-full px-8 py-3 hover:bg-blue-700 transition disabled:opacity-50 shadow-md">ค้นหา</button>
             </form>
           </div>
-
           {searchedStudent && (
             <div className={`p-6 rounded-3xl border transition-colors duration-300 ${theme.card}`}>
               <div className={`mb-8 p-5 rounded-2xl border flex flex-col md:flex-row justify-between md:items-center ${isDarkMode ? 'bg-blue-900/20 border-blue-800/30' : 'bg-blue-50 border-blue-100'}`}>
@@ -559,11 +571,8 @@ export default function Dashboard() {
                   <p className={`text-sm mt-1 ${isDarkMode ? 'text-blue-300' : 'text-gray-600'}`}>รหัส: {searchedStudent.StudentID} | ระดับชั้น: {searchedStudent.ClassLevel}</p>
                 </div>
               </div>
-
               {!hasScores ? (
-                <div className={`text-center p-10 rounded-2xl border ${isDarkMode ? 'border-gray-700 text-gray-400' : 'border-gray-200 text-gray-500'}`}>
-                  ยังไม่มีข้อมูลคะแนนในระบบสำหรับรหัสนักเรียนนี้
-                </div>
+                <div className={`text-center p-10 rounded-2xl border ${isDarkMode ? 'border-gray-700 text-gray-400' : 'border-gray-200 text-gray-500'}`}>ยังไม่มีข้อมูลคะแนนในระบบสำหรับรหัสนักเรียนนี้</div>
               ) : (
                 <div className="space-y-6">
                   {Object.keys(groupedScores).map((subject: string) => (
@@ -603,17 +612,11 @@ export default function Dashboard() {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 font-sans relative transition-colors duration-300 ${theme.bg}`}>
         <FullPageLoader />
-        
-        <button onClick={() => setAppMode('student')} className={`absolute top-6 left-6 text-sm font-medium transition-colors ${theme.textMuted} hover:text-blue-500`}>
-          ← กลับไปหน้านักเรียน
-        </button>
+        <button onClick={() => setAppMode('student')} className={`absolute top-6 left-6 text-sm font-medium transition-colors ${theme.textMuted} hover:text-blue-500`}>← กลับไปหน้านักเรียน</button>
         <div className="absolute top-6 right-6 flex items-center gap-3">
           <NetworkStatus />
-          <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>
-            {isDarkMode ? '🌙' : '☀️'}
-          </button>
+          <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>{isDarkMode ? '🌙' : '☀️'}</button>
         </div>
-        
         <div className={`p-10 rounded-3xl border w-full max-w-md transition-colors duration-300 relative z-10 ${theme.card}`}>
           <div className="text-center mb-8">
             <img src="/logo.png" alt="Logo" className="w-20 h-20 sm:w-24 sm:h-24 object-contain mx-auto mb-4 drop-shadow-md" onError={(e) => e.currentTarget.style.display = 'none'} />
@@ -622,13 +625,9 @@ export default function Dashboard() {
           </div>
           {errorMsg && <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-sm mb-6 text-center border border-red-100">{errorMsg}</div>}
           <form onSubmit={handleLoginSubmit} className="space-y-5">
-            <input type="text" placeholder="Username" required onChange={(e) => setLoginData({...loginData, username: e.target.value})}
-              className={`w-full border rounded-2xl px-5 py-3.5 outline-none transition-colors ${theme.input}`} />
-            <input type="password" placeholder="Password" required onChange={(e) => setLoginData({...loginData, password: e.target.value})}
-              className={`w-full border rounded-2xl px-5 py-3.5 outline-none transition-colors ${theme.input}`} />
-            <button type="submit" disabled={loading} className={theme.primaryButton}>
-              เข้าสู่ระบบ
-            </button>
+            <input type="text" placeholder="Username" required onChange={(e) => setLoginData({...loginData, username: e.target.value})} className={`w-full border rounded-2xl px-5 py-3.5 outline-none transition-colors ${theme.input}`} />
+            <input type="password" placeholder="Password" required onChange={(e) => setLoginData({...loginData, password: e.target.value})} className={`w-full border rounded-2xl px-5 py-3.5 outline-none transition-colors ${theme.input}`} />
+            <button type="submit" disabled={loading} className={theme.primaryButton}>เข้าสู่ระบบ</button>
           </form>
         </div>
       </div>
@@ -637,12 +636,9 @@ export default function Dashboard() {
 
   return (
     <div className={`min-h-screen p-6 lg:p-10 font-sans transition-colors duration-300 relative ${theme.bg}`}>
-      
       <ToastNotification />
       <FullPageLoader />
-
       <div className="max-w-6xl mx-auto space-y-6 relative z-10">
-        
         <header className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 rounded-3xl border gap-4 transition-colors duration-300 ${theme.card}`}>
           <div className="flex items-center gap-4">
             <img src="/logo.png" alt="Logo" className="w-12 h-12 sm:w-14 sm:h-14 object-contain drop-shadow-sm" onError={(e) => e.currentTarget.style.display = 'none'} />
@@ -653,19 +649,14 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-3">
             <NetworkStatus />
-            <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>
-              {isDarkMode ? '🌙' : '☀️'}
-            </button>
-            <button onClick={handleLogout} className={`text-sm py-2 px-4 rounded-full font-medium transition-colors ${isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}>
-              ออกจากระบบ
-            </button>
+            <button onClick={toggleDarkMode} className={`p-2.5 rounded-full border transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-yellow-300' : 'bg-white border-gray-200 text-gray-600'}`}>{isDarkMode ? '🌙' : '☀️'}</button>
+            <button onClick={handleLogout} className={`text-sm py-2 px-4 rounded-full font-medium transition-colors ${isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}>ออกจากระบบ</button>
           </div>
         </header>
 
         <div className={`flex space-x-1 p-1.5 rounded-full border overflow-x-auto transition-colors duration-300 ${theme.card}`}>
           {['students', 'subjects', 'assignments', 'scores', 'reports'].map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-3 px-4 rounded-full text-sm font-medium transition whitespace-nowrap ${activeTab === tab ? theme.buttonTabActive : theme.buttonTabInactive}`}>
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 py-3 px-4 rounded-full text-sm font-medium transition whitespace-nowrap ${activeTab === tab ? theme.buttonTabActive : theme.buttonTabInactive}`}>
               {tab === 'students' ? '👨‍🎓 นักเรียน' : tab === 'subjects' ? '📖 วิชา' : tab === 'assignments' ? '📚 งาน' : tab === 'scores' ? '📝 คะแนน' : '🖨️ ออกรายงาน'}
             </button>
           ))}
@@ -676,14 +667,8 @@ export default function Dashboard() {
             
             {activeTab === 'scores' && (
               <div className={`flex gap-2 mb-6 p-1.5 rounded-2xl ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                <button type="button" onClick={() => setScoreMode('individual')} 
-                  className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${scoreMode === 'individual' ? (isDarkMode ? 'bg-gray-600 text-blue-400 shadow' : 'bg-white text-blue-600 shadow') : (isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700')}`}>
-                  👤 รายบุคคล
-                </button>
-                <button type="button" onClick={() => setScoreMode('group')} 
-                  className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${scoreMode === 'group' ? (isDarkMode ? 'bg-gray-600 text-blue-400 shadow' : 'bg-white text-blue-600 shadow') : (isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700')}`}>
-                  👥 รายกลุ่ม
-                </button>
+                <button type="button" onClick={() => setScoreMode('individual')} className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${scoreMode === 'individual' ? (isDarkMode ? 'bg-gray-600 text-blue-400 shadow' : 'bg-white text-blue-600 shadow') : (isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700')}`}>👤 รายบุคคล</button>
+                <button type="button" onClick={() => setScoreMode('group')} className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${scoreMode === 'group' ? (isDarkMode ? 'bg-gray-600 text-blue-400 shadow' : 'bg-white text-blue-600 shadow') : (isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700')}`}>👥 รายกลุ่ม</button>
               </div>
             )}
 
@@ -717,7 +702,7 @@ export default function Dashboard() {
             )}
 
             {activeTab === 'assignments' && (
-              <form onSubmit={(e) => { e.preventDefault(); submitData('addAssignment', assignmentForm, () => setAssignmentForm({classLevel:'', subject:'', workName:''})); }} className="space-y-4">
+              <form onSubmit={(e) => { e.preventDefault(); submitData('addAssignment', assignmentForm, () => setAssignmentForm({classLevel:'', subject:'', workName:'', maxScore:''})); }} className="space-y-4">
                 <select required value={assignmentForm.classLevel} onChange={e => setAssignmentForm({...assignmentForm, classLevel: e.target.value, subject: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกระดับชั้น --</option><option value="ปวช">ปวช</option><option value="ปวส">ปวส</option><option value="ป.ตรี">ป.ตรี</option>
                 </select>
@@ -726,6 +711,7 @@ export default function Dashboard() {
                   {subjectsForAssignmentForm.map((s: any, i: number) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
                 </select>
                 <input type="text" placeholder="ชื่อชิ้นงาน" value={assignmentForm.workName} onChange={e => setAssignmentForm({...assignmentForm, workName: e.target.value})} required className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`} />
+                <input type="number" placeholder="คะแนนเก็บของชิ้นงาน (เช่น 10)" value={assignmentForm.maxScore} onChange={e => setAssignmentForm({...assignmentForm, maxScore: e.target.value})} required className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`} />
                 <button type="submit" disabled={loading} className={theme.primaryButton}>บันทึกชิ้นงาน</button>
               </form>
             )}
@@ -735,12 +721,10 @@ export default function Dashboard() {
                 <select required value={scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, classLevel: e.target.value, studentId: '', name: '', subject: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกระดับชั้น --</option><option value="ปวช">ปวช</option><option value="ปวส">ปวส</option><option value="ป.ตรี">ป.ตรี</option>
                 </select>
-                
                 <select required value={scoreForm.subject} disabled={!scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, subject: e.target.value, studentId: '', name: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกรายวิชา --</option>
                   {subjectsForScoreForm.map((s: any, i: number) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
                 </select>
-
                 <select required value={scoreForm.studentId} disabled={!scoreForm.subject} onChange={e => {
                   const selectedId = e.target.value;
                   if (!selectedId) { setScoreForm({...scoreForm, studentId: '', name: ''}); } 
@@ -753,29 +737,55 @@ export default function Dashboard() {
                 {scoreForm.studentId && scoreForm.subject ? (
                   filteredWorks.length > 0 ? (
                     <div className="mt-6 space-y-4">
-                      {filteredWorks.map((w: any, i: number) => (
-                        <div key={i} className={`flex flex-col gap-3 p-4 rounded-2xl border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
-                          <div className="flex justify-between items-center">
-                            <label className={`text-sm font-bold truncate ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{w.WorkName}</label>
-                            <input type="number" placeholder="กรอกเอง" value={multiScores[w.WorkName] || ''} onChange={e => setMultiScores({...multiScores, [w.WorkName]: e.target.value})} className={`w-20 border rounded-xl px-2 py-1 outline-none text-center font-bold text-blue-500 ${theme.input}`} />
+                      {filteredWorks.map((w: any, i: number) => {
+                        const maxScore = Number(w.MaxScore || 10);
+                        const rawMax = Number(rawMaxScores[w.WorkName] || maxScore);
+                        const isScaled = rawMax !== maxScore;
+                        const btnCount = Math.min(rawMax, 50);
+
+                        return (
+                          <div key={i} className={`flex flex-col p-4 rounded-2xl border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                            <div className="flex justify-between items-center mb-2">
+                              <div className="w-1/2 pr-2">
+                                <label className={`text-sm font-bold truncate block ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{w.WorkName}</label>
+                                <p className={`text-[10px] ${theme.textMuted}`}>คะแนนเก็บ: {maxScore}</p>
+                              </div>
+                              <div className="flex items-center gap-1 w-1/2 justify-end">
+                                <div className="flex flex-col items-center w-16">
+                                  <span className={`text-[10px] ${theme.textMuted}`}>ได้</span>
+                                  <input type="number" placeholder="ดิบ" value={multiScores[w.WorkName] || ''} onChange={e => setMultiScores({...multiScores, [w.WorkName]: e.target.value})} className={`w-full border rounded-xl px-2 py-1 outline-none text-center font-bold text-blue-500 ${theme.input}`} />
+                                </div>
+                                <span className={`text-lg font-light ${theme.textMuted}`}>/</span>
+                                <div className="flex flex-col items-center w-16">
+                                  <span className={`text-[10px] ${theme.textMuted}`}>เต็มตอนตรวจ</span>
+                                  <input type="number" value={rawMaxScores[w.WorkName] || String(maxScore)} onChange={e => setRawMaxScores({...rawMaxScores, [w.WorkName]: e.target.value})} className={`w-full border rounded-xl px-2 py-1 outline-none text-center font-bold text-gray-500 ${theme.input}`} />
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {isScaled && multiScores[w.WorkName] && (
+                               <div className="text-right text-xs text-green-500 font-bold mb-2 animate-pulse">
+                                 ✨ แปลงลงระบบ: {Number(((Number(multiScores[w.WorkName]) / (rawMax || 1)) * maxScore).toFixed(2))} / {maxScore} คะแนน
+                               </div>
+                            )}
+
+                            <div className="flex overflow-x-auto md:flex-wrap gap-2 pb-2 pt-2 px-1 snap-x md:snap-none [&::-webkit-scrollbar]:hidden md:[&::-webkit-scrollbar]:auto">
+                              {[...Array(btnCount + 1).keys()].map(val => (
+                                <button key={val} type="button" onClick={() => setMultiScores({...multiScores, [w.WorkName]: String(val)})}
+                                  className={`flex-shrink-0 snap-center w-11 h-11 sm:w-12 sm:h-12 rounded-full font-bold text-base sm:text-lg transition-all duration-200 ${multiScores[w.WorkName] === String(val) ? 'bg-blue-600 text-white shadow-md scale-110' : isDarkMode ? 'bg-gray-700 text-gray-300 border border-gray-600' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'}`}>
+                                  {val}
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                          <div className="flex overflow-x-auto md:flex-wrap gap-2 pb-4 pt-2 px-1 snap-x md:snap-none [&::-webkit-scrollbar]:hidden md:[&::-webkit-scrollbar]:auto">
-                            {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].map(val => (
-                              <button key={val} type="button" onClick={() => setMultiScores({...multiScores, [w.WorkName]: String(val)})}
-                                className={`flex-shrink-0 snap-center w-11 h-11 sm:w-12 sm:h-12 rounded-full font-bold text-base sm:text-lg transition-all duration-200 ${multiScores[w.WorkName] === String(val) ? 'bg-blue-600 text-white shadow-md scale-110' : isDarkMode ? 'bg-gray-700 text-gray-300 border border-gray-600' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'}`}>
-                                {val}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className={`mt-4 p-4 text-center rounded-2xl border ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>ยังไม่มีชิ้นงานในรายวิชานี้ กรุณาเพิ่มชิ้นงานก่อน</div>
                   )
                 ) : null}
-
-                <div className="pt-4"><button type="submit" disabled={loading || filteredWorks.length === 0} className={theme.primaryButton}>บันทึกคะแนน</button></div>
+                <div className="pt-4"><button type="submit" disabled={loading || filteredWorks.length === 0} className={theme.primaryButton}>บันทึก / อัปเดตคะแนน</button></div>
               </form>
             )}
 
@@ -784,12 +794,10 @@ export default function Dashboard() {
                 <select required value={groupScoreForm.classLevel} onChange={e => setGroupScoreForm({...groupScoreForm, classLevel: e.target.value, subject: '', workName: '', score: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกระดับชั้น --</option><option value="ปวช">ปวช</option><option value="ปวส">ปวส</option><option value="ป.ตรี">ป.ตรี</option>
                 </select>
-                
                 <select required value={groupScoreForm.subject} disabled={!groupScoreForm.classLevel} onChange={e => setGroupScoreForm({...groupScoreForm, subject: e.target.value, workName: '', score: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกรายวิชา --</option>
                   {subjectsForGroupForm.map((s: any, i: number) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
                 </select>
-
                 <select required value={groupScoreForm.workName} disabled={!groupScoreForm.subject} onChange={e => setGroupScoreForm({...groupScoreForm, workName: e.target.value, score: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกชิ้นงาน (กลุ่ม) --</option>
                   {groupWorks.map((w: any, i: number) => <option key={i} value={w.WorkName}>{w.WorkName}</option>)}
@@ -814,23 +822,54 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className={`flex flex-col gap-3 p-4 rounded-2xl border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
-                      <div className="flex justify-between items-center">
-                        <label className={`text-sm font-bold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>คะแนนสำหรับกลุ่มนี้</label>
-                        <input type="number" placeholder="กรอกเอง" value={groupScoreForm.score} onChange={e => setGroupScoreForm({...groupScoreForm, score: e.target.value})} className={`w-20 border rounded-xl px-2 py-1 outline-none text-center font-bold text-blue-500 ${theme.input}`} />
-                      </div>
-                      <div className="flex overflow-x-auto md:flex-wrap gap-2 pb-4 pt-2 px-1 snap-x md:snap-none [&::-webkit-scrollbar]:hidden md:[&::-webkit-scrollbar]:auto">
-                        {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].map(val => (
-                          <button key={val} type="button" onClick={() => setGroupScoreForm({...groupScoreForm, score: String(val)})}
-                            className={`flex-shrink-0 snap-center w-11 h-11 sm:w-12 sm:h-12 rounded-full font-bold text-base sm:text-lg transition-all duration-200 ${groupScoreForm.score === String(val) ? 'bg-blue-600 text-white shadow-md scale-110' : isDarkMode ? 'bg-gray-700 text-gray-300 border border-gray-600' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'}`}>
-                            {val}
-                          </button>
-                        ))}
-                      </div>
+                    <div className={`flex flex-col p-4 rounded-2xl border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                      {(() => {
+                        const selectedGroupWork = groupWorks.find(w => w.WorkName === groupScoreForm.workName);
+                        const groupMax = Number(selectedGroupWork?.MaxScore || 10);
+                        const rawMax = Number(groupRawMaxScore || groupMax);
+                        const isScaled = rawMax !== groupMax;
+                        const btnCount = Math.min(rawMax, 50);
+
+                        return (
+                          <>
+                            <div className="flex justify-between items-center mb-2">
+                              <div className="w-1/2 pr-2">
+                                <label className={`text-sm font-bold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>คะแนนสำหรับกลุ่มนี้</label>
+                                <p className={`text-[10px] ${theme.textMuted}`}>คะแนนเก็บ: {groupMax}</p>
+                              </div>
+                              <div className="flex items-center gap-1 w-1/2 justify-end">
+                                <div className="flex flex-col items-center w-16">
+                                  <span className={`text-[10px] ${theme.textMuted}`}>ได้</span>
+                                  <input type="number" placeholder="ดิบ" value={groupScoreForm.score} onChange={e => setGroupScoreForm({...groupScoreForm, score: e.target.value})} className={`w-full border rounded-xl px-2 py-1 outline-none text-center font-bold text-blue-500 ${theme.input}`} />
+                                </div>
+                                <span className={`text-lg font-light ${theme.textMuted}`}>/</span>
+                                <div className="flex flex-col items-center w-16">
+                                  <span className={`text-[10px] ${theme.textMuted}`}>เต็มตอนตรวจ</span>
+                                  <input type="number" value={groupRawMaxScore} onChange={e => setGroupRawMaxScore(e.target.value)} className={`w-full border rounded-xl px-2 py-1 outline-none text-center font-bold text-gray-500 ${theme.input}`} />
+                                </div>
+                              </div>
+                            </div>
+
+                            {isScaled && groupScoreForm.score && (
+                               <div className="text-right text-xs text-green-500 font-bold mb-2 animate-pulse">
+                                 ✨ แปลงลงระบบ: {Number(((Number(groupScoreForm.score) / (rawMax || 1)) * groupMax).toFixed(2))} / {groupMax} คะแนน
+                               </div>
+                            )}
+
+                            <div className="flex overflow-x-auto md:flex-wrap gap-2 pb-2 pt-2 px-1 snap-x md:snap-none [&::-webkit-scrollbar]:hidden md:[&::-webkit-scrollbar]:auto">
+                              {[...Array(btnCount + 1).keys()].map(val => (
+                                <button key={val} type="button" onClick={() => setGroupScoreForm({...groupScoreForm, score: String(val)})}
+                                  className={`flex-shrink-0 snap-center w-11 h-11 sm:w-12 sm:h-12 rounded-full font-bold text-base sm:text-lg transition-all duration-200 ${groupScoreForm.score === String(val) ? 'bg-blue-600 text-white shadow-md scale-110' : isDarkMode ? 'bg-gray-700 text-gray-300 border border-gray-600' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'}`}>
+                                  {val}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </>
                 )}
-
                 <div className="pt-4"><button type="submit" disabled={loading || selectedStudents.length === 0} className={theme.primaryButton}>บันทึกคะแนนกลุ่ม</button></div>
               </form>
             )}
@@ -891,12 +930,13 @@ export default function Dashboard() {
                 )}
                 {activeTab === 'assignments' && (
                   <>
-                    <thead><tr className={`text-sm border-b ${theme.tableHead}`}><th className="p-4 font-medium">ระดับชั้น</th><th className="p-4 font-medium">รายวิชา</th><th className="p-4 font-medium">ชื่อชิ้นงาน</th><th className="p-4 font-medium text-center w-32">จัดการ</th></tr></thead>
+                    <thead><tr className={`text-sm border-b ${theme.tableHead}`}><th className="p-4 font-medium">ระดับชั้น</th><th className="p-4 font-medium">รายวิชา</th><th className="p-4 font-medium">ชื่อชิ้นงาน</th><th className="p-4 font-medium text-center">คะแนนเก็บ</th><th className="p-4 font-medium text-center w-32">จัดการ</th></tr></thead>
                     <tbody className="text-sm">
-                      {filteredTableAssignments.length === 0 ? <tr><td colSpan={4} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
+                      {filteredTableAssignments.length === 0 ? <tr><td colSpan={5} className={`text-center p-8 ${theme.textMuted}`}>ยังไม่มีข้อมูล</td></tr> : 
                         filteredTableAssignments.map((row: any, i: number) => (
                           <tr key={i} className={`border-b transition-colors ${theme.tableRow}`}>
                             <td className="p-4">{row.ClassLevel}</td><td className="p-4">{row.Subject}</td><td className="p-4">{row.WorkName}</td>
+                            <td className="p-4 text-center font-bold text-blue-500">{row.MaxScore || 10}</td>
                             <td className="p-4 text-center">
                               <div className="flex justify-center items-center gap-2">
                                 <button onClick={() => handleEditAssignment(row.ClassLevel, row.Subject, row.WorkName)} className="text-blue-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-blue-500 transition">แก้ไข</button>
