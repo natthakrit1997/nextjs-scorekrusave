@@ -26,24 +26,35 @@ export default function Dashboard() {
 
   const [studentForm, setStudentForm] = useState({ studentId: '', name: '', classLevel: '' });
   const [subjectForm, setSubjectForm] = useState({ classLevel: '', subject: '' });
-  // [อัปเดต] เพิ่มช่อง maxScore (คะแนนเก็บ)
   const [assignmentForm, setAssignmentForm] = useState({ classLevel: '', subject: '', workName: '', maxScore: '' });
   
   const [scoreForm, setScoreForm] = useState({ classLevel: '', studentId: '', name: '', subject: '' });
   const [multiScores, setMultiScores] = useState<Record<string, string>>({}); 
-  
-  // [อัปเดต] ตัวแปรเก็บ "คะแนนเต็มตอนตรวจ" สำหรับการเทียบบัญญัติไตรยางศ์
   const [rawMaxScores, setRawMaxScores] = useState<Record<string, string>>({}); 
 
   const [scoreMode, setScoreMode] = useState<'individual' | 'group'>('individual');
   const [groupScoreForm, setGroupScoreForm] = useState({ classLevel: '', subject: '', workName: '', score: '' });
-  const [groupRawMaxScore, setGroupRawMaxScore] = useState(''); // คะแนนเต็มตอนตรวจโหมดกลุ่ม
+  const [groupRawMaxScore, setGroupRawMaxScore] = useState('');
   const [selectedStudents, setSelectedStudents] = useState<any[]>([]);
 
   const [reportForm, setReportForm] = useState({ classLevel: '', subject: '' });
+
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
   const [netSpeed, setNetSpeed] = useState<number | null>(null);
   const [isOnline, setIsOnline] = useState<boolean>(true);
+
+  // --- ฟังก์ชันแปลงคะแนนรวมให้เป็นเกรด (ตามเกณฑ์ 100 คะแนน) ---
+  const getGrade = (score: number) => {
+    if (score >= 80) return '4';
+    if (score >= 75) return '3.5';
+    if (score >= 70) return '3';
+    if (score >= 65) return '2.5';
+    if (score >= 60) return '2';
+    if (score >= 55) return '1.5';
+    if (score >= 50) return '1';
+    return '0';
+  };
 
   useEffect(() => {
     setIsOnline(navigator.onLine);
@@ -68,7 +79,6 @@ export default function Dashboard() {
     }
   }, []);
 
-  // โหลดคะแนนเก่าและตั้งค่าเริ่มต้นคะแนนเต็ม
   useEffect(() => {
     if (scoreMode === 'individual' && scoreForm.studentId && scoreForm.subject) {
       const works = assignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel && a.TeacherName === teacherName);
@@ -83,7 +93,6 @@ export default function Dashboard() {
           sc.TeacherName === teacherName
         );
         initialScores[w.WorkName] = existing ? String(existing.Score) : '';
-        // ตั้งค่าเริ่มต้นของคะแนนเต็มดิบ ให้เท่ากับคะแนนเก็บของชิ้นงาน (ค่าเริ่มต้นคือ 10 หากไม่มีข้อมูล)
         initialRawMax[w.WorkName] = w.MaxScore ? String(w.MaxScore) : '10'; 
       });
       setMultiScores(initialScores);
@@ -202,7 +211,6 @@ export default function Dashboard() {
     }
   };
 
-  // Submit แบบรายบุคคล พร้อมระบบแปลงคะแนน
   const submitMultipleScores = async (e: any) => {
     e.preventDefault();
     setLoading(true);
@@ -211,11 +219,10 @@ export default function Dashboard() {
       const rawValStr = multiScores[workName];
       if (rawValStr === "") return null;
       
-      // การคำนวณเทียบบัญญัติไตรยางศ์
       const w = filteredWorks.find(wx => wx.WorkName === workName);
-      const maxScore = Number(w?.MaxScore || 10); // คะแนนเก็บ
-      const rawMax = Number(rawMaxScores[workName] || maxScore); // คะแนนเต็มที่กรอก
-      const rawVal = Number(rawValStr); // คะแนนที่ได้
+      const maxScore = Number(w?.MaxScore || 10);
+      const rawMax = Number(rawMaxScores[workName] || maxScore);
+      const rawVal = Number(rawValStr);
       
       const finalScore = rawMax > 0 ? Number(((rawVal / rawMax) * maxScore).toFixed(2)) : rawVal;
       
@@ -236,7 +243,6 @@ export default function Dashboard() {
     } catch (error) { showToast('เกิดข้อผิดพลาดในการบันทึกคะแนน', 'error'); setLoading(false); }
   };
 
-  // Submit แบบรายกลุ่ม พร้อมระบบแปลงคะแนน
   const submitGroupScores = async (e: any) => {
     e.preventDefault();
     if (selectedStudents.length === 0) { showToast('กรุณาเลือกนักเรียนอย่างน้อย 1 คน', 'error'); return; }
@@ -363,6 +369,7 @@ export default function Dashboard() {
           th { background-color: #f5f5f5; font-weight: 600; }
           .text-left { text-align: left; }
           .total-col { font-weight: 600; }
+          .grade-col { font-weight: 600; color: #1e3a8a; }
           @media print { @page { margin: 1cm; } body { padding: 0; } }
         </style>
       </head>
@@ -381,6 +388,7 @@ export default function Dashboard() {
               <th class="text-left">ชื่อ-นามสกุล</th>
               ${subjectWorks.map((w: any) => `<th>${w.WorkName}</th>`).join('')}
               <th class="total-col">รวม</th>
+              <th class="grade-col">เกรด</th>
             </tr>
           </thead>
           <tbody>
@@ -393,6 +401,9 @@ export default function Dashboard() {
                 return `<td>${s ? s.Score : '-'}</td>`;
               }).join('');
               
+              // ประเมินผลเกรดอัตโนมัติ
+              const grade = getGrade(totalScore);
+
               return `
                 <tr>
                   <td>${idx + 1}</td>
@@ -400,6 +411,7 @@ export default function Dashboard() {
                   <td class="text-left">${student.Name}</td>
                   ${scoresHtml}
                   <td class="total-col">${totalScore}</td>
+                  <td class="grade-col">${grade}</td>
                 </tr>
               `;
             }).join('')}
@@ -469,7 +481,6 @@ export default function Dashboard() {
     else setSelectedStudents([...filteredGroupStudents]);
   };
 
-  // โหลดค่าคะแนนเต็มให้โหมดกลุ่มอัตโนมัติ
   useEffect(() => {
     if (scoreMode === 'group' && groupScoreForm.workName) {
       const w = groupWorks.find(gw => gw.WorkName === groupScoreForm.workName);
@@ -584,7 +595,9 @@ export default function Dashboard() {
                         </div>
                         <div className="text-right bg-blue-100 dark:bg-blue-900/30 px-4 py-2 rounded-xl border border-blue-200 dark:border-blue-800">
                           <span className={`text-xs block ${isDarkMode ? 'text-blue-300' : 'text-blue-700'}`}>คะแนนรวม</span>
-                          <span className="font-bold text-2xl text-blue-600 dark:text-blue-400">{groupedScores[subject].total}</span>
+                          <span className="font-bold text-2xl text-blue-600 dark:text-blue-400">
+                            {groupedScores[subject].total} <span className="text-lg">({getGrade(groupedScores[subject].total)})</span>
+                          </span>
                         </div>
                       </div>
                       <table className="w-full text-left border-collapse">
@@ -721,10 +734,12 @@ export default function Dashboard() {
                 <select required value={scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, classLevel: e.target.value, studentId: '', name: '', subject: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกระดับชั้น --</option><option value="ปวช">ปวช</option><option value="ปวส">ปวส</option><option value="ป.ตรี">ป.ตรี</option>
                 </select>
+                
                 <select required value={scoreForm.subject} disabled={!scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, subject: e.target.value, studentId: '', name: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกรายวิชา --</option>
                   {subjectsForScoreForm.map((s: any, i: number) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
                 </select>
+
                 <select required value={scoreForm.studentId} disabled={!scoreForm.subject} onChange={e => {
                   const selectedId = e.target.value;
                   if (!selectedId) { setScoreForm({...scoreForm, studentId: '', name: ''}); } 
