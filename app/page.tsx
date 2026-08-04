@@ -37,7 +37,8 @@ export default function Dashboard() {
   const [groupRawMaxScore, setGroupRawMaxScore] = useState('');
   const [selectedStudents, setSelectedStudents] = useState<any[]>([]);
 
-  const [reportForm, setReportForm] = useState({ classLevel: '', subject: '' });
+  // [อัปเดต] เพิ่ม workName เพื่อรองรับการเลือกงานแบบเจาะจง
+  const [reportForm, setReportForm] = useState({ classLevel: '', subject: '', workName: '' });
 
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
@@ -423,16 +424,12 @@ export default function Dashboard() {
     printWindow.document.close();
   };
 
-  // --- [ใหม่] ฟังก์ชันพิมพ์รายงานสรุปคนค้างส่งงาน ---
   const handlePrintMissingWork = () => {
     if (!reportForm.classLevel || !reportForm.subject) {
-      alert("กรุณาเลือกระดับชั้นและรายวิชา");
-      return;
+      alert("กรุณาเลือกระดับชั้นและรายวิชา"); return;
     }
 
     const subjectWorks = myAssignments.filter(a => a.ClassLevel === reportForm.classLevel && a.Subject === reportForm.subject);
-    
-    // ดึงรายชื่อนักเรียนที่มีการลงทะเบียน (มีคะแนนอย่างน้อย 1 ช่องในวิชานี้)
     const enrolledStudentIds = new Set(
       myScores.filter(sc => sc.Subject === reportForm.subject && sc.ClassLevel === reportForm.classLevel).map(sc => String(sc.StudentID))
     );
@@ -440,25 +437,14 @@ export default function Dashboard() {
     let subjectStudents = students.filter(s => s.ClassLevel === reportForm.classLevel && enrolledStudentIds.has(String(s.StudentID)));
     subjectStudents.sort((a, b) => String(a.StudentID).localeCompare(String(b.StudentID)));
 
-    if (subjectStudents.length === 0) {
-      alert("ไม่พบรายชื่อนักเรียนในวิชานี้");
-      return;
-    }
+    if (subjectStudents.length === 0) { alert("ไม่พบรายชื่อนักเรียนในวิชานี้"); return; }
 
-    // ประมวลผลหาคนที่ค้างส่งงาน
     const missingData = subjectStudents.map(student => {
-      // หางานทั้งหมดที่เด็กคนนี้ส่งไปแล้วในวิชานี้
       const studentScores = myScores.filter(sc => String(sc.StudentID) === String(student.StudentID) && sc.Subject === reportForm.subject);
       const submittedWorkNames = new Set(studentScores.map(sc => sc.WorkName));
-      
-      // เทียบกับงานทั้งหมดของวิชา เพื่อหาว่าขาดงานไหน
       const missingWorks = subjectWorks.filter(w => !submittedWorkNames.has(w.WorkName));
-      
-      return {
-        ...student,
-        missingWorks
-      };
-    }).filter(student => student.missingWorks.length > 0); // กรองเอาเฉพาะคนที่มีงานค้าง
+      return { ...student, missingWorks };
+    }).filter(student => student.missingWorks.length > 0);
 
     let printWindow = window.open('', '_blank');
     if (!printWindow) { alert("กรุณาอนุญาต Pop-up เพื่อดูรายงาน"); return; }
@@ -468,26 +454,26 @@ export default function Dashboard() {
       <html lang="th">
       <head>
         <meta charset="UTF-8">
-        <title>รายงานค้างส่งงาน - ${reportForm.subject}</title>
+        <title>รายงานค้างส่งงานรวม - ${reportForm.subject}</title>
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&display=swap');
           body { font-family: 'Sarabun', sans-serif; padding: 20px; color: #333; }
           .header { text-align: center; margin-bottom: 20px; }
           .logo { height: 60px; margin-bottom: 10px; object-fit: contain; }
-          .header h2 { margin: 0; font-size: 24px; color: #b91c1c; }
+          .header h2 { margin: 0; font-size: 24px; color: #d97706; }
           .header p { margin: 5px 0; font-size: 16px; }
           table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
           th, td { border: 1px solid #000; padding: 10px; text-align: center; vertical-align: top; }
-          th { background-color: #fef2f2; font-weight: 600; color: #991b1b; }
+          th { background-color: #fff7ed; font-weight: 600; color: #9a3412; }
           .text-left { text-align: left; }
-          .missing-list { color: #dc2626; font-weight: 600; margin: 0; padding-left: 20px; text-align: left; }
+          .missing-list { color: #c2410c; font-weight: 600; margin: 0; padding-left: 20px; text-align: left; }
           @media print { @page { margin: 1cm; } body { padding: 0; } }
         </style>
       </head>
       <body>
         <div class="header">
           <img src="/logo.png" alt="Logo" class="logo" onerror="this.style.display='none'" />
-          <h2>รายงานสรุปรายชื่อนักเรียนค้างส่งงาน</h2>
+          <h2>รายงานสรุปรายชื่อนักเรียนค้างส่งงาน (รวมทุกชิ้น)</h2>
           <p>ระดับชั้น: <b>${reportForm.classLevel}</b> | รายวิชา: <b>${reportForm.subject}</b></p>
           <p>ผู้สอน: ${teacherName}</p>
         </div>
@@ -513,6 +499,86 @@ export default function Dashboard() {
                 </td>
               </tr>
             `).join('') : `<tr><td colspan="4" style="padding: 30px; font-size: 16px; color: #166534;">🎉 ยอดเยี่ยม! นักเรียนทุกคนส่งงานครบถ้วน 🎉</td></tr>`}
+          </tbody>
+        </table>
+        <script>window.onload = function() { window.print(); }</script>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  // --- [อัปเดตใหม่] ฟังก์ชันพิมพ์รายงานคนไม่ส่งงาน เฉพาะชิ้นงานที่เลือก ---
+  const handlePrintSpecificMissingWork = () => {
+    if (!reportForm.classLevel || !reportForm.subject || !reportForm.workName) {
+      alert("กรุณาเลือกระดับชั้น รายวิชา และชิ้นงาน"); return;
+    }
+
+    const enrolledStudentIds = new Set(
+      myScores.filter(sc => sc.Subject === reportForm.subject && sc.ClassLevel === reportForm.classLevel).map(sc => String(sc.StudentID))
+    );
+
+    let subjectStudents = students.filter(s => s.ClassLevel === reportForm.classLevel && enrolledStudentIds.has(String(s.StudentID)));
+    subjectStudents.sort((a, b) => String(a.StudentID).localeCompare(String(b.StudentID)));
+
+    if (subjectStudents.length === 0) { alert("ไม่พบรายชื่อนักเรียนในวิชานี้"); return; }
+
+    // ดึงรายชื่อเฉพาะคนที่ 'ไม่มีคะแนน' ในชิ้นงานที่ระบุ
+    const missingData = subjectStudents.filter(student => {
+      const hasScore = myScores.some(sc => String(sc.StudentID) === String(student.StudentID) && sc.Subject === reportForm.subject && sc.WorkName === reportForm.workName);
+      return !hasScore;
+    });
+
+    let printWindow = window.open('', '_blank');
+    if (!printWindow) { alert("กรุณาอนุญาต Pop-up เพื่อดูรายงาน"); return; }
+
+    let html = `
+      <!DOCTYPE html>
+      <html lang="th">
+      <head>
+        <meta charset="UTF-8">
+        <title>รายงานค้างส่ง - ${reportForm.workName}</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&display=swap');
+          body { font-family: 'Sarabun', sans-serif; padding: 20px; color: #333; }
+          .header { text-align: center; margin-bottom: 20px; }
+          .logo { height: 60px; margin-bottom: 10px; object-fit: contain; }
+          .header h2 { margin: 0; font-size: 24px; color: #be123c; }
+          .header p { margin: 5px 0; font-size: 16px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
+          th, td { border: 1px solid #000; padding: 10px; text-align: center; vertical-align: middle; }
+          th { background-color: #fff1f2; font-weight: 600; color: #9f1239; }
+          .text-left { text-align: left; }
+          @media print { @page { margin: 1cm; } body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <img src="/logo.png" alt="Logo" class="logo" onerror="this.style.display='none'" />
+          <h2>รายงานนักเรียนค้างส่งงาน (เฉพาะชิ้น)</h2>
+          <p>ระดับชั้น: <b>${reportForm.classLevel}</b> | รายวิชา: <b>${reportForm.subject}</b></p>
+          <p>ชิ้นงาน: <b style="color: #be123c; font-size: 18px;">${reportForm.workName}</b></p>
+          <p>ผู้สอน: ${teacherName}</p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th width="15%">ลำดับ</th>
+              <th width="25%">รหัสนักเรียน</th>
+              <th width="40%" class="text-left">ชื่อ-นามสกุล</th>
+              <th width="20%">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${missingData.length > 0 ? missingData.map((s, idx) => `
+              <tr>
+                <td>${idx + 1}</td>
+                <td>${s.StudentID}</td>
+                <td class="text-left">${s.Name}</td>
+                <td style="color: #e11d48; font-weight: bold;">ยังไม่ส่งงาน</td>
+              </tr>
+            `).join('') : `<tr><td colspan="4" style="padding: 30px; font-size: 16px; color: #166534;">🎉 ยอดเยี่ยม! นักเรียนทุกคนส่งงานชิ้นนี้แล้ว 🎉</td></tr>`}
           </tbody>
         </table>
         <script>window.onload = function() { window.print(); }</script>
@@ -565,6 +631,9 @@ export default function Dashboard() {
   const subjectsForGroupForm = mySubjects.filter(s => s.ClassLevel === groupScoreForm.classLevel);
   const filteredWorks = myAssignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel);
   const subjectsForReportForm = mySubjects.filter(s => s.ClassLevel === reportForm.classLevel);
+  
+  // งานทั้งหมดของวิชาที่เลือกในเมนูออกรายงาน
+  const reportWorks = myAssignments.filter(a => a.Subject === reportForm.subject && a.ClassLevel === reportForm.classLevel);
 
   const handleToggleStudent = (student: any) => {
     if (selectedStudents.some(s => s.StudentID === student.StudentID)) {
@@ -989,22 +1058,37 @@ export default function Dashboard() {
 
             {activeTab === 'reports' && (
               <form className="space-y-4">
-                <select required value={reportForm.classLevel} onChange={e => setReportForm({classLevel: e.target.value, subject: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
+                <select required value={reportForm.classLevel} onChange={e => setReportForm({classLevel: e.target.value, subject: '', workName: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกระดับชั้น --</option><option value="ปวช">ปวช</option><option value="ปวส">ปวส</option><option value="ป.ตรี">ป.ตรี</option>
                 </select>
-                <select required value={reportForm.subject} disabled={!reportForm.classLevel} onChange={e => setReportForm({...reportForm, subject: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
+                <select required value={reportForm.subject} disabled={!reportForm.classLevel} onChange={e => setReportForm({...reportForm, subject: e.target.value, workName: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกรายวิชา --</option>
                   {subjectsForReportForm.map((s: any, i: number) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
                 </select>
                 
-                {/* [อัปเดต] เปลี่ยนปุ่มเป็น 2 ปุ่มให้เลือกตามจุดประสงค์ */}
-                <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                  <button type="button" onClick={handlePrintReport} disabled={loading || !reportForm.subject} className="flex-1 bg-green-600 text-white font-medium rounded-full p-3 hover:bg-green-700 shadow-md hover:shadow-lg transition disabled:opacity-50">
-                    พิมพ์คะแนน/เกรด
-                  </button>
-                  <button type="button" onClick={handlePrintMissingWork} disabled={loading || !reportForm.subject} className="flex-1 bg-orange-500 text-white font-medium rounded-full p-3 hover:bg-orange-600 shadow-md hover:shadow-lg transition disabled:opacity-50">
-                    พิมพ์คนไม่ส่งงาน
-                  </button>
+                {/* [อัปเดต] ตัวเลือกเสริม: เลือกชิ้นงานเฉพาะเจาะจง */}
+                {reportForm.subject && (
+                  <select value={reportForm.workName} onChange={e => setReportForm({...reportForm, workName: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
+                    <option value="">-- เลือกชิ้นงาน (ตัวเลือกเสริม) --</option>
+                    {reportWorks.map((w: any, i: number) => <option key={i} value={w.WorkName}>{w.WorkName}</option>)}
+                  </select>
+                )}
+                
+                <div className="flex flex-col gap-3 mt-4">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button type="button" onClick={handlePrintReport} disabled={loading || !reportForm.subject} className="flex-1 bg-green-600 text-white font-medium rounded-2xl p-3 hover:bg-green-700 shadow-md hover:shadow-lg transition disabled:opacity-50">
+                      📊 พิมพ์คะแนน/เกรด
+                    </button>
+                    <button type="button" onClick={handlePrintMissingWork} disabled={loading || !reportForm.subject} className="flex-1 bg-orange-500 text-white font-medium rounded-2xl p-3 hover:bg-orange-600 shadow-md hover:shadow-lg transition disabled:opacity-50">
+                      ⚠️ พิมพ์คนไม่ส่งงาน (ทุกชิ้น)
+                    </button>
+                  </div>
+                  
+                  {reportForm.workName && (
+                    <button type="button" onClick={handlePrintSpecificMissingWork} disabled={loading || !reportForm.workName} className="w-full bg-rose-600 text-white font-medium rounded-2xl p-3 hover:bg-rose-700 shadow-md hover:shadow-lg transition disabled:opacity-50">
+                      🎯 พิมพ์คนไม่ส่งงาน (เฉพาะชิ้นที่เลือก)
+                    </button>
+                  )}
                 </div>
               </form>
             )}
