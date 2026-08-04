@@ -28,8 +28,15 @@ export default function Dashboard() {
   const [subjectForm, setSubjectForm] = useState({ classLevel: '', subject: '' });
   const [assignmentForm, setAssignmentForm] = useState({ classLevel: '', subject: '', workName: '' });
   
+  // โหมดให้คะแนนแบบรายบุคคล
   const [scoreForm, setScoreForm] = useState({ classLevel: '', studentId: '', name: '', subject: '' });
   const [multiScores, setMultiScores] = useState<Record<string, string>>({}); 
+
+  // [อัปเดต] โหมดให้คะแนนแบบกลุ่ม
+  const [scoreMode, setScoreMode] = useState<'individual' | 'group'>('individual');
+  const [groupScoreForm, setGroupScoreForm] = useState({ classLevel: '', subject: '', workName: '', score: '' });
+  const [selectedStudents, setSelectedStudents] = useState<any[]>([]);
+
   const [reportForm, setReportForm] = useState({ classLevel: '', subject: '' });
 
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
@@ -60,8 +67,9 @@ export default function Dashboard() {
     }
   }, []);
 
+  // ดึงคะแนนเก่า (โหมดรายคน)
   useEffect(() => {
-    if (scoreForm.studentId && scoreForm.subject) {
+    if (scoreMode === 'individual' && scoreForm.studentId && scoreForm.subject) {
       const works = assignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel && a.TeacherName === teacherName);
       const initialScores: Record<string, string> = {};
       works.forEach(w => {
@@ -77,7 +85,7 @@ export default function Dashboard() {
     } else {
       setMultiScores({});
     }
-  }, [scoreForm.studentId, scoreForm.subject, scoreForm.classLevel, scores, teacherName, assignments]);
+  }, [scoreForm.studentId, scoreForm.subject, scoreForm.classLevel, scores, teacherName, assignments, scoreMode]);
 
   useEffect(() => {
     fetchAllData();
@@ -182,50 +190,58 @@ export default function Dashboard() {
       await fetchAllData(); 
       showToast('บันทึกข้อมูลเรียบร้อยแล้ว!', 'success');
     } catch (error) {
-      console.error("Error saving data:", error);
       showToast('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
       setLoading(false); 
     }
   };
 
+  // Submit แบบรายบุคคล
   const submitMultipleScores = async (e: any) => {
     e.preventDefault();
     setLoading(true);
-    
-    const scoresArray = Object.keys(multiScores).map(workName => ({
-      workName,
-      score: multiScores[workName]
-    })).filter(item => item.score !== "");
+    const scoresArray = Object.keys(multiScores).map(workName => ({ workName, score: multiScores[workName] })).filter(item => item.score !== "");
 
-    if(scoresArray.length === 0) {
-      showToast('กรุณากรอกคะแนนอย่างน้อย 1 ชิ้นงาน', 'error');
-      setLoading(false);
-      return;
-    }
+    if(scoresArray.length === 0) { showToast('กรุณากรอกคะแนนอย่างน้อย 1 ชิ้นงาน', 'error'); setLoading(false); return; }
 
     try {
       await fetch(API_URL, {
         method: "POST",
+        body: JSON.stringify({ action: "addMultipleScores", classLevel: scoreForm.classLevel, studentId: scoreForm.studentId, name: scoreForm.name, subject: scoreForm.subject, scores: scoresArray, teacherName }),
+        headers: { "Content-Type": "text/plain;charset=utf-8" }
+      });
+      await fetchAllData(); 
+      showToast('กรอกคะแนนเสร็จสิ้น! ✨', 'success');
+      setScoreForm(prev => ({...prev, studentId: '', name: ''}));
+    } catch (error) { showToast('เกิดข้อผิดพลาดในการบันทึกคะแนน', 'error'); setLoading(false); }
+  };
+
+  // Submit แบบรายกลุ่ม
+  const submitGroupScores = async (e: any) => {
+    e.preventDefault();
+    if (selectedStudents.length === 0) { showToast('กรุณาเลือกนักเรียนอย่างน้อย 1 คน', 'error'); return; }
+    if (!groupScoreForm.score) { showToast('กรุณากรอกคะแนน', 'error'); return; }
+    
+    setLoading(true);
+    try {
+      await fetch(API_URL, {
+        method: "POST",
         body: JSON.stringify({ 
-          action: "addMultipleScores", 
-          classLevel: scoreForm.classLevel,
-          studentId: scoreForm.studentId,
-          name: scoreForm.name,
-          subject: scoreForm.subject,
-          scores: scoresArray,
+          action: "addGroupScores", 
+          classLevel: groupScoreForm.classLevel, 
+          subject: groupScoreForm.subject, 
+          workName: groupScoreForm.workName, 
+          score: groupScoreForm.score, 
+          students: selectedStudents.map(s => ({ id: s.StudentID, name: s.Name })), 
           teacherName 
         }),
         headers: { "Content-Type": "text/plain;charset=utf-8" }
       });
-      
       await fetchAllData(); 
-      showToast('กรอกคะแนนเสร็จสิ้น! ✨', 'success');
-      setScoreForm(prev => ({...prev, studentId: '', name: ''}));
-    } catch (error) {
-      console.error("Error saving scores:", error);
-      showToast('เกิดข้อผิดพลาดในการบันทึกคะแนน', 'error');
-      setLoading(false);
-    }
+      showToast('บันทึกคะแนนกลุ่มเสร็จสิ้น! ✨', 'success');
+      setSelectedStudents([]); // เคลียร์รายชื่อที่เลือก
+      setGroupScoreForm(prev => ({...prev, score: ''})); // เคลียร์คะแนน
+    } catch (error) { showToast('เกิดข้อผิดพลาดในการบันทึกคะแนน', 'error'); } 
+    finally { setLoading(false); }
   };
 
   const handleDeleteStudent = async (studentId: string, studentName: string) => {
@@ -273,10 +289,7 @@ export default function Dashboard() {
         });
         await fetchAllData(); 
         showToast('อัปเดตชื่อชิ้นงานเรียบร้อยแล้ว', 'success');
-      } catch (error) { 
-        showToast('เกิดข้อผิดพลาดในการแก้ไขข้อมูล', 'error'); 
-        setLoading(false); 
-      }
+      } catch (error) { showToast('เกิดข้อผิดพลาดในการแก้ไขข้อมูล', 'error'); setLoading(false); }
     }
   };
 
@@ -386,20 +399,23 @@ export default function Dashboard() {
   const tableMyAssignments = [...myAssignments].reverse();
   const tableMyScores = [...myScores].reverse();
 
-  // --- ระบบกรองข้อมูลตาราง (Contextual Filtering) ---
   const filteredTableAssignments = tableMyAssignments.filter(a => {
     if (assignmentForm.classLevel && a.ClassLevel !== assignmentForm.classLevel) return false;
     if (assignmentForm.subject && a.Subject !== assignmentForm.subject) return false;
     return true;
   });
 
-  // [อัปเดตใหม่] ระบบกรองตารางคะแนน ให้สัมพันธ์กับหน้า "คะแนน" และหน้า "ออกรายงาน"
   const filteredTableScores = tableMyScores.filter(sc => {
     if (activeTab === 'scores') {
-      if (scoreForm.classLevel && sc.ClassLevel !== scoreForm.classLevel) return false;
-      if (scoreForm.subject && sc.Subject !== scoreForm.subject) return false;
-      // ถ้าระบุตัวเด็กด้วย ก็กรองให้เหลือแต่เด็กคนนั้นเลย
-      if (scoreForm.studentId && String(sc.StudentID) !== String(scoreForm.studentId)) return false;
+      if (scoreMode === 'individual') {
+        if (scoreForm.classLevel && sc.ClassLevel !== scoreForm.classLevel) return false;
+        if (scoreForm.subject && sc.Subject !== scoreForm.subject) return false;
+        if (scoreForm.studentId && String(sc.StudentID) !== String(scoreForm.studentId)) return false;
+      } else {
+        if (groupScoreForm.classLevel && sc.ClassLevel !== groupScoreForm.classLevel) return false;
+        if (groupScoreForm.subject && sc.Subject !== groupScoreForm.subject) return false;
+        if (groupScoreForm.workName && sc.WorkName !== groupScoreForm.workName) return false;
+      }
     } else if (activeTab === 'reports') {
       if (reportForm.classLevel && sc.ClassLevel !== reportForm.classLevel) return false;
       if (reportForm.subject && sc.Subject !== reportForm.subject) return false;
@@ -408,11 +424,30 @@ export default function Dashboard() {
   });
 
   const uniqueClasses = Array.from(new Set(students.map(s => s.ClassLevel)));
+  
+  // กรองตามฟอร์ม
   const filteredStudents = students.filter(s => s.ClassLevel === scoreForm.classLevel);
+  const filteredGroupStudents = students.filter(s => s.ClassLevel === groupScoreForm.classLevel);
+  const groupWorks = myAssignments.filter(a => a.Subject === groupScoreForm.subject && a.ClassLevel === groupScoreForm.classLevel);
+
   const subjectsForAssignmentForm = mySubjects.filter(s => s.ClassLevel === assignmentForm.classLevel);
   const subjectsForScoreForm = mySubjects.filter(s => s.ClassLevel === scoreForm.classLevel);
+  const subjectsForGroupForm = mySubjects.filter(s => s.ClassLevel === groupScoreForm.classLevel);
   const filteredWorks = myAssignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel);
   const subjectsForReportForm = mySubjects.filter(s => s.ClassLevel === reportForm.classLevel);
+
+  // Toggle การเลือกนักเรียนแบบกลุ่ม
+  const handleToggleStudent = (student: any) => {
+    if (selectedStudents.some(s => s.StudentID === student.StudentID)) {
+      setSelectedStudents(selectedStudents.filter(s => s.StudentID !== student.StudentID));
+    } else {
+      setSelectedStudents([...selectedStudents, student]);
+    }
+  };
+  const handleSelectAllStudents = () => {
+    if (selectedStudents.length === filteredGroupStudents.length) setSelectedStudents([]);
+    else setSelectedStudents([...filteredGroupStudents]);
+  };
 
   const theme = {
     bg: isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-800",
@@ -475,6 +510,7 @@ export default function Dashboard() {
     );
   };
 
+  // UI หน้าต่างๆ เหมือนเดิม ขอข้ามมาที่ Admin เลย
   if (appMode === 'student') {
     const groupedScores = getGroupedScores();
     const hasScores = Object.keys(groupedScores).length > 0;
@@ -637,8 +673,26 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className={`p-6 rounded-3xl border h-fit transition-colors duration-300 ${theme.card}`}>
+            
+            {activeTab === 'scores' && (
+              <div className={`flex gap-2 mb-6 p-1.5 rounded-2xl ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                <button type="button" onClick={() => setScoreMode('individual')} 
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${scoreMode === 'individual' ? (isDarkMode ? 'bg-gray-600 text-blue-400 shadow' : 'bg-white text-blue-600 shadow') : (isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700')}`}>
+                  👤 รายบุคคล
+                </button>
+                <button type="button" onClick={() => setScoreMode('group')} 
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${scoreMode === 'group' ? (isDarkMode ? 'bg-gray-600 text-blue-400 shadow' : 'bg-white text-blue-600 shadow') : (isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700')}`}>
+                  👥 รายกลุ่ม
+                </button>
+              </div>
+            )}
+
             <h2 className="text-lg font-semibold mb-5">
-              {activeTab === 'students' ? 'เพิ่มนักเรียนใหม่' : activeTab === 'subjects' ? 'เพิ่มรายวิชาใหม่' : activeTab === 'assignments' ? 'เพิ่มชิ้นงานใหม่' : activeTab === 'reports' ? 'พิมพ์รายงาน' : 'ให้คะแนนนักเรียน'}
+              {activeTab === 'students' ? 'เพิ่มนักเรียนใหม่' 
+                : activeTab === 'subjects' ? 'เพิ่มรายวิชาใหม่' 
+                : activeTab === 'assignments' ? 'เพิ่มชิ้นงานใหม่' 
+                : activeTab === 'reports' ? 'พิมพ์รายงาน' 
+                : (scoreMode === 'individual' ? 'ให้คะแนน (1 คน / หลายงาน)' : 'ให้คะแนนกลุ่ม (หลายคน / 1 งาน)')}
             </h2>
             
             {activeTab === 'students' && (
@@ -676,7 +730,7 @@ export default function Dashboard() {
               </form>
             )}
 
-            {activeTab === 'scores' && (
+            {activeTab === 'scores' && scoreMode === 'individual' && (
               <form onSubmit={submitMultipleScores} className="space-y-4">
                 <select required value={scoreForm.classLevel} onChange={e => setScoreForm({...scoreForm, classLevel: e.target.value, studentId: '', name: '', subject: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                   <option value="">-- เลือกระดับชั้น --</option><option value="ปวช">ปวช</option><option value="ปวส">ปวส</option><option value="ป.ตรี">ป.ตรี</option>
@@ -701,43 +755,83 @@ export default function Dashboard() {
                     <div className="mt-6 space-y-4">
                       {filteredWorks.map((w: any, i: number) => (
                         <div key={i} className={`flex flex-col gap-3 p-4 rounded-2xl border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
-                          
                           <div className="flex justify-between items-center">
                             <label className={`text-sm font-bold truncate ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{w.WorkName}</label>
-                            <input type="number" placeholder="กรอกเอง" value={multiScores[w.WorkName] || ''} onChange={e => setMultiScores({...multiScores, [w.WorkName]: e.target.value})} 
-                              className={`w-20 border rounded-xl px-2 py-1 outline-none text-center font-bold text-blue-500 ${theme.input}`} />
+                            <input type="number" placeholder="กรอกเอง" value={multiScores[w.WorkName] || ''} onChange={e => setMultiScores({...multiScores, [w.WorkName]: e.target.value})} className={`w-20 border rounded-xl px-2 py-1 outline-none text-center font-bold text-blue-500 ${theme.input}`} />
                           </div>
-                          
                           <div className="flex overflow-x-auto md:flex-wrap gap-2 pb-4 pt-2 px-1 snap-x md:snap-none [&::-webkit-scrollbar]:hidden md:[&::-webkit-scrollbar]:auto">
                             {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].map(val => (
-                              <button
-                                key={val}
-                                type="button"
-                                onClick={() => setMultiScores({...multiScores, [w.WorkName]: String(val)})}
-                                className={`flex-shrink-0 snap-center w-11 h-11 sm:w-12 sm:h-12 rounded-full font-bold text-base sm:text-lg transition-all duration-200 ${
-                                  multiScores[w.WorkName] === String(val) 
-                                    ? 'bg-blue-600 text-white shadow-md scale-110' 
-                                    : isDarkMode ? 'bg-gray-700 text-gray-300 border border-gray-600' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
-                                }`}
-                              >
+                              <button key={val} type="button" onClick={() => setMultiScores({...multiScores, [w.WorkName]: String(val)})}
+                                className={`flex-shrink-0 snap-center w-11 h-11 sm:w-12 sm:h-12 rounded-full font-bold text-base sm:text-lg transition-all duration-200 ${multiScores[w.WorkName] === String(val) ? 'bg-blue-600 text-white shadow-md scale-110' : isDarkMode ? 'bg-gray-700 text-gray-300 border border-gray-600' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'}`}>
                                 {val}
                               </button>
                             ))}
                           </div>
-
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className={`mt-4 p-4 text-center rounded-2xl border ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
-                      ยังไม่มีชิ้นงานในรายวิชานี้ กรุณาเพิ่มชิ้นงานก่อน
-                    </div>
+                    <div className={`mt-4 p-4 text-center rounded-2xl border ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>ยังไม่มีชิ้นงานในรายวิชานี้ กรุณาเพิ่มชิ้นงานก่อน</div>
                   )
                 ) : null}
 
-                <div className="pt-4">
-                  <button type="submit" disabled={loading || filteredWorks.length === 0} className={theme.primaryButton}>บันทึก / อัปเดตคะแนนทั้งหมด</button>
-                </div>
+                <div className="pt-4"><button type="submit" disabled={loading || filteredWorks.length === 0} className={theme.primaryButton}>บันทึกคะแนน</button></div>
+              </form>
+            )}
+
+            {activeTab === 'scores' && scoreMode === 'group' && (
+              <form onSubmit={submitGroupScores} className="space-y-4">
+                <select required value={groupScoreForm.classLevel} onChange={e => setGroupScoreForm({...groupScoreForm, classLevel: e.target.value, subject: '', workName: '', score: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
+                  <option value="">-- เลือกระดับชั้น --</option><option value="ปวช">ปวช</option><option value="ปวส">ปวส</option><option value="ป.ตรี">ป.ตรี</option>
+                </select>
+                
+                <select required value={groupScoreForm.subject} disabled={!groupScoreForm.classLevel} onChange={e => setGroupScoreForm({...groupScoreForm, subject: e.target.value, workName: '', score: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
+                  <option value="">-- เลือกรายวิชา --</option>
+                  {subjectsForGroupForm.map((s: any, i: number) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
+                </select>
+
+                <select required value={groupScoreForm.workName} disabled={!groupScoreForm.subject} onChange={e => setGroupScoreForm({...groupScoreForm, workName: e.target.value, score: ''})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
+                  <option value="">-- เลือกชิ้นงาน (กลุ่ม) --</option>
+                  {groupWorks.map((w: any, i: number) => <option key={i} value={w.WorkName}>{w.WorkName}</option>)}
+                </select>
+
+                {groupScoreForm.workName && (
+                  <>
+                    <div className={`border rounded-2xl overflow-hidden ${isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`}>
+                      <div className={`p-3 border-b flex justify-between items-center ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                        <span className={`text-sm font-bold ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>เลือกสมาชิกกลุ่ม ({selectedStudents.length}/{filteredGroupStudents.length})</span>
+                        <button type="button" onClick={handleSelectAllStudents} className="text-sm text-blue-500 font-medium hover:underline">
+                          {selectedStudents.length === filteredGroupStudents.length ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด'}
+                        </button>
+                      </div>
+                      <div className="max-h-52 overflow-y-auto p-2 space-y-1">
+                        {filteredGroupStudents.map((s: any) => (
+                          <label key={s.StudentID} className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-colors ${isDarkMode ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-blue-50 text-gray-700'}`}>
+                            <input type="checkbox" className="w-4 h-4 text-blue-600 rounded" checked={selectedStudents.some(sel => sel.StudentID === s.StudentID)} onChange={() => handleToggleStudent(s)} />
+                            <span className="text-sm">{s.StudentID} - {s.Name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className={`flex flex-col gap-3 p-4 rounded-2xl border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                      <div className="flex justify-between items-center">
+                        <label className={`text-sm font-bold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>คะแนนสำหรับกลุ่มนี้</label>
+                        <input type="number" placeholder="กรอกเอง" value={groupScoreForm.score} onChange={e => setGroupScoreForm({...groupScoreForm, score: e.target.value})} className={`w-20 border rounded-xl px-2 py-1 outline-none text-center font-bold text-blue-500 ${theme.input}`} />
+                      </div>
+                      <div className="flex overflow-x-auto md:flex-wrap gap-2 pb-4 pt-2 px-1 snap-x md:snap-none [&::-webkit-scrollbar]:hidden md:[&::-webkit-scrollbar]:auto">
+                        {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].map(val => (
+                          <button key={val} type="button" onClick={() => setGroupScoreForm({...groupScoreForm, score: String(val)})}
+                            className={`flex-shrink-0 snap-center w-11 h-11 sm:w-12 sm:h-12 rounded-full font-bold text-base sm:text-lg transition-all duration-200 ${groupScoreForm.score === String(val) ? 'bg-blue-600 text-white shadow-md scale-110' : isDarkMode ? 'bg-gray-700 text-gray-300 border border-gray-600' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'}`}>
+                            {val}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div className="pt-4"><button type="submit" disabled={loading || selectedStudents.length === 0} className={theme.primaryButton}>บันทึกคะแนนกลุ่ม</button></div>
               </form>
             )}
 
@@ -759,12 +853,11 @@ export default function Dashboard() {
 
           <div className={`lg:col-span-2 p-6 rounded-3xl border transition-colors duration-300 ${theme.card}`}>
             <h2 className="text-lg font-semibold mb-5">
-              {/* เปลี่ยนหัวข้อตารางให้สัมพันธ์กับเมนูทางซ้าย */}
               {activeTab === 'students' ? 'รายชื่อนักเรียนทั้งหมด (ส่วนกลาง)' 
                : activeTab === 'subjects' ? 'วิชาของฉัน' 
                : activeTab === 'assignments' ? (assignmentForm.subject ? `ชิ้นงานของวิชา: ${assignmentForm.subject}` : 'ชิ้นงานทั้งหมดของฉัน')
                : activeTab === 'reports' ? (reportForm.subject ? `ตัวอย่างคะแนนวิชา: ${reportForm.subject}` : 'ตัวอย่างข้อมูลคะแนน') 
-               : (scoreForm.subject ? `คะแนนของวิชา: ${scoreForm.subject}` : 'คะแนนล่าสุดของฉัน')}
+               : (scoreMode === 'individual' && scoreForm.subject ? `คะแนนของวิชา: ${scoreForm.subject}` : scoreMode === 'group' && groupScoreForm.subject ? `คะแนนของวิชา: ${groupScoreForm.subject}` : 'คะแนนล่าสุดของฉัน')}
             </h2>
             <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700">
               <table className="w-full text-left border-collapse">
