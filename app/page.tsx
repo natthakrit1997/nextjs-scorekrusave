@@ -37,7 +37,6 @@ export default function Dashboard() {
   const [groupRawMaxScore, setGroupRawMaxScore] = useState('');
   const [selectedStudents, setSelectedStudents] = useState<any[]>([]);
 
-  // [อัปเดต] เพิ่ม workName เพื่อรองรับการเลือกงานแบบเจาะจง
   const [reportForm, setReportForm] = useState({ classLevel: '', subject: '', workName: '' });
 
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
@@ -308,18 +307,39 @@ export default function Dashboard() {
     }
   };
 
-  const handleEditAssignment = async (classLevel: string, subject: string, oldWorkName: string) => {
-    const newWorkName = window.prompt(`แก้ไขชื่อชิ้นงาน "${oldWorkName}" เป็น:`, oldWorkName);
-    if (newWorkName && newWorkName.trim() !== "" && newWorkName.trim() !== oldWorkName) {
+  // --- [อัปเดต] ฟังก์ชันแก้ไขข้อมูลชิ้นงาน (แก้ได้ทั้งชื่อ และ คะแนนเต็ม) ---
+  const handleEditAssignment = async (classLevel: string, subject: string, oldWorkName: string, oldMaxScore: string) => {
+    // 1. หน้าต่างถามชื่อชิ้นงานใหม่
+    const newWorkName = window.prompt(`[ขั้นตอน 1/2] แก้ไข "ชื่อชิ้นงาน" :`, oldWorkName);
+    if (newWorkName === null) return; // กดยกเลิก
+    
+    // 2. หน้าต่างถามคะแนนเก็บ (คะแนนเต็ม) ใหม่
+    const currentMax = oldMaxScore || "10";
+    const newMaxScore = window.prompt(`[ขั้นตอน 2/2] แก้ไข "คะแนนเก็บ" (คะแนนเต็ม) ของชิ้นงาน ${newWorkName.trim() || oldWorkName} :`, currentMax);
+    if (newMaxScore === null) return; // กดยกเลิก
+
+    if (newWorkName.trim() !== "" && newMaxScore.trim() !== "") {
       setLoading(true);
       try {
         await fetch(API_URL, {
           method: "POST",
-          body: JSON.stringify({ action: "editAssignment", classLevel, subject, oldWorkName, newWorkName: newWorkName.trim(), teacherName }),
+          body: JSON.stringify({ 
+            action: "editAssignment", 
+            classLevel, 
+            subject, 
+            oldWorkName, 
+            newWorkName: newWorkName.trim(), 
+            newMaxScore: newMaxScore.trim(), 
+            teacherName 
+          }),
           headers: { "Content-Type": "text/plain;charset=utf-8" }
         });
-        await fetchAllData(); showToast('อัปเดตชื่อชิ้นงานเรียบร้อยแล้ว', 'success');
-      } catch (error) { showToast('เกิดข้อผิดพลาดในการแก้ไขข้อมูล', 'error'); setLoading(false); }
+        await fetchAllData(); 
+        showToast('อัปเดตชิ้นงานและคะแนนเก็บเรียบร้อยแล้ว', 'success');
+      } catch (error) { 
+        showToast('เกิดข้อผิดพลาดในการแก้ไขข้อมูล', 'error'); 
+        setLoading(false); 
+      }
     }
   };
 
@@ -509,7 +529,6 @@ export default function Dashboard() {
     printWindow.document.close();
   };
 
-  // --- [อัปเดตใหม่] ฟังก์ชันพิมพ์รายงานคนไม่ส่งงาน เฉพาะชิ้นงานที่เลือก ---
   const handlePrintSpecificMissingWork = () => {
     if (!reportForm.classLevel || !reportForm.subject || !reportForm.workName) {
       alert("กรุณาเลือกระดับชั้น รายวิชา และชิ้นงาน"); return;
@@ -524,7 +543,6 @@ export default function Dashboard() {
 
     if (subjectStudents.length === 0) { alert("ไม่พบรายชื่อนักเรียนในวิชานี้"); return; }
 
-    // ดึงรายชื่อเฉพาะคนที่ 'ไม่มีคะแนน' ในชิ้นงานที่ระบุ
     const missingData = subjectStudents.filter(student => {
       const hasScore = myScores.some(sc => String(sc.StudentID) === String(student.StudentID) && sc.Subject === reportForm.subject && sc.WorkName === reportForm.workName);
       return !hasScore;
@@ -632,7 +650,6 @@ export default function Dashboard() {
   const filteredWorks = myAssignments.filter(a => a.Subject === scoreForm.subject && a.ClassLevel === scoreForm.classLevel);
   const subjectsForReportForm = mySubjects.filter(s => s.ClassLevel === reportForm.classLevel);
   
-  // งานทั้งหมดของวิชาที่เลือกในเมนูออกรายงาน
   const reportWorks = myAssignments.filter(a => a.Subject === reportForm.subject && a.ClassLevel === reportForm.classLevel);
 
   const handleToggleStudent = (student: any) => {
@@ -1066,7 +1083,6 @@ export default function Dashboard() {
                   {subjectsForReportForm.map((s: any, i: number) => <option key={i} value={s.Subject}>{s.Subject}</option>)}
                 </select>
                 
-                {/* [อัปเดต] ตัวเลือกเสริม: เลือกชิ้นงานเฉพาะเจาะจง */}
                 {reportForm.subject && (
                   <select value={reportForm.workName} onChange={e => setReportForm({...reportForm, workName: e.target.value})} className={`w-full border rounded-2xl px-4 py-3 outline-none ${theme.input}`}>
                     <option value="">-- เลือกชิ้นงาน (ตัวเลือกเสริม) --</option>
@@ -1143,7 +1159,7 @@ export default function Dashboard() {
                             <td className="p-4 text-center font-bold text-blue-500">{row.MaxScore || 10}</td>
                             <td className="p-4 text-center">
                               <div className="flex justify-center items-center gap-2">
-                                <button onClick={() => handleEditAssignment(row.ClassLevel, row.Subject, row.WorkName)} className="text-blue-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-blue-500 transition">แก้ไข</button>
+                                <button onClick={() => handleEditAssignment(row.ClassLevel, row.Subject, row.WorkName, row.MaxScore)} className="text-blue-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-blue-500 transition">แก้ไข</button>
                                 <button onClick={() => handleDeleteAssignment(row.ClassLevel, row.Subject, row.WorkName)} className="text-red-500 hover:text-white font-medium py-1.5 px-3 rounded-full hover:bg-red-500 transition">ลบ</button>
                               </div>
                             </td>
